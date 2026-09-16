@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { Search, Share as ShareIcon } from 'lucide-react-native';
 import { Body, Card, Display, Pill, ProgressDots, Screen, SectionLabel } from '@/components/ui';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
@@ -10,7 +11,9 @@ import { useAuth } from '@/lib/auth';
 import { colors, fonts, radius } from '@/theme';
 
 const TOTAL_CONTACTS = 412;
-const INVITE_LINK = '[domain]/i/jeff';
+// Swap in the real domain once it's registered.
+export const INVITE_DOMAIN = '[domain]';
+export const inviteLink = (username?: string | null) => `${INVITE_DOMAIN}/i/${username || 'you'}`;
 
 export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) {
   const [q, setQ] = useState('');
@@ -19,7 +22,14 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const sent = useStore((s) => s.invitesSent);
   const addFriend = useStore((s) => s.addFriend);
   const sendInvite = useStore((s) => s.sendInvite);
-  const { finishOnboarding } = useAuth();
+  const { finishOnboarding, profile } = useAuth();
+  const link = inviteLink(profile?.username);
+  const copy = async () => {
+    await Clipboard.setStringAsync(link).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const share = () => Share.share({ message: `See the times we almost crossed paths, maybe before we even met. Join me on Near Miss: ${link}` }).catch(() => {});
 
   const query = q.trim().toLowerCase();
   const onApp = useMemo(
@@ -36,7 +46,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     <Screen>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
-          <Display size={32}>Friends</Display>
+          <Display size={32}>{onboarding ? 'Find your friends' : 'Invite'}</Display>
           {onboarding && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <ProgressDots total={3} active={3} />
@@ -59,15 +69,16 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
         {!query && (
           <View style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violet, gap: 12 }}>
-            <View style={{ gap: 2 }}>
-              <Body size={14} color="rgba(255,255,255,0.85)">Waiting in your photos</Body>
-              <Display size={22} style={{ color: colors.white }}>7 possible near misses</Display>
-              <Body size={14} color="rgba(255,255,255,0.85)">Each one unlocks when that person joins.</Body>
+            <View style={{ gap: 4 }}>
+              <Display size={22} style={{ color: colors.white }}>Invite friends to see your missed connections</Display>
+              <Body size={14} color="rgba(255,255,255,0.85)">When they join and scan their photos, you'll both see every time you were steps apart.</Body>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 6, paddingLeft: 14, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.14)' }}>
-              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.white }}>{INVITE_LINK}</Text>
-              {/* expo-clipboard is wired up in step 4 */}
-              <Pressable onPress={() => setCopied(true)} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.white }}>{link}</Text>
+              <Pressable accessibilityLabel="Share invite link" onPress={share} hitSlop={6} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                <ShareIcon size={18} color={colors.white} strokeWidth={2} />
+              </Pressable>
+              <Pressable onPress={copy} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.violet }}>{copied ? 'Copied' : 'Copy link'}</Text>
               </Pressable>
             </View>

@@ -5,6 +5,8 @@ import * as Linking from 'expo-linking';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { useScan } from '@/state/scan';
+import { usePlaces } from '@/lib/places';
 
 export type Profile = {
   id: string;
@@ -56,6 +58,7 @@ type AuthState = {
   saveProfile: (p: { username: string; name: string; bio: string }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   finishOnboarding: () => Promise<void>;
+  uploadAvatar: (image: { uri: string; mimeType?: string | null }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -209,6 +212,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (demo) { setDemo(false); setProfile(null); setSettings(defaultSettings); return; }
     if (googleAvailable && googleModule) await googleModule.GoogleSignin.signOut().catch(() => {});
+    useScan.getState().reset();
+    usePlaces.getState().reset();
     await supabase.auth.signOut();
   }, [demo]);
 
@@ -235,6 +240,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) { setSettings(settings); throw new UserFacingError(error.message); }
   }, [demo, session, settings]);
 
+  const uploadAvatar = useCallback(async ({ uri, mimeType }: { uri: string; mimeType?: string | null }) => {
+    if (demo || !session) { setProfile((p) => ({ ...(p ?? demoProfile), avatar_url: uri })); return; }
+    const type = mimeType && /^image\/(jpeg|png|webp|heic)$/.test(mimeType) ? mimeType : 'image/jpeg';
+    const ext = type.split('/')[1].replace('jpeg', 'jpg');
+    const body = await (await fetch(uri)).arrayBuffer();
+    if (body.byteLength > 5 * 1024 * 1024) throw new UserFacingError('That photo is too big. Try another one.');
+    const uid = session.user.id;
+    const path = `${uid}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, body, { contentType: type, upsert: false });
+    if (upErr) throw new UserFacingError(`Couldn't upload your photo: ${upErr.message}`);
+    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+    const { data, error } = await supabase.from('profiles').update({ avatar_url: pub.publicUrl }).eq('id', uid).select('id, username, name, bio, avatar_url').single();
+    if (error) throw new UserFacingError(error.message);
+    const old = profile?.avatar_url?.split('/avatars/')[1];
+    setProfile(data);
+    // Tidy up the previous upload (Google/Apple photos live elsewhere and are left alone).
+    if (old && old.startsWith(`${uid}/`)) supabase.storage.from('avatars').remove([decodeURIComponent(old)]).catch(() => {});
+  }, [demo, session, profile]);
+
   const finishOnboarding = useCallback(async () => {
     await updateSettings({ onboarded_at: new Date().toISOString() });
   }, [updateSettings]);
@@ -258,7 +282,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveProfile,
     updateSettings,
     finishOnboarding,
-  }), [loading, userLoaded, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
+    uploadAvatar,
+  }), [loading, userLoaded, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding, uploadAvatar]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

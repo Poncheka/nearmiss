@@ -1,13 +1,13 @@
 import { Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { User, Users } from 'lucide-react-native';
+import { User, UserPlus } from 'lucide-react-native';
 import { OverlapIcon } from '@/components/art';
 import { colors, fonts } from '@/theme';
 
 const TABS: Record<string, { label: string; icon: (c: string) => React.ReactNode }> = {
+  invite: { label: 'Invite', icon: (c) => <UserPlus size={24} color={c} strokeWidth={1.8} /> },
   index: { label: 'Near misses', icon: (c) => <OverlapIcon color={c} /> },
-  friends: { label: 'Friends', icon: (c) => <Users size={24} color={c} strokeWidth={1.8} /> },
   you: { label: 'You', icon: (c) => <User size={24} color={c} strokeWidth={1.8} /> },
 };
 
@@ -44,9 +44,10 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 
 export default function TabsLayout() {
   return (
-    <Tabs tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}>
+    <Tabs initialRouteName="index" backBehavior="initialRoute" tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}>
+      {/* Near misses sits in the middle; the app still opens on it. */}
+      <Tabs.Screen name="invite" />
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="friends" />
       <Tabs.Screen name="you" />
     </Tabs>
   );

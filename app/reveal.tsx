@@ -30,7 +30,10 @@ export default function Reveal() {
   const isCard = step >= 1 && step <= 3;
   const nm = cards[Math.max(0, step - 1)];
   const cta = ['Show me', 'Next', 'Next', 'Next', 'Send to Maya'][step];
-  const secondary = step === LAST ? 'Share to story' : step === 0 ? 'Later' : 'See all in feed';
+  const secondary = step === LAST ? 'Share to story' : step === 0 ? 'Later' : 'See more';
+  const onSecondary = step === LAST ? undefined : isCard
+    ? () => router.replace({ pathname: '/near-miss/[id]', params: { id: nm.id } })
+    : close;
   const anim = { opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] };
 
   return (
@@ -91,7 +94,7 @@ export default function Reveal() {
 
         <View style={{ gap: 8 }}>
           <Button label={cta} onPress={next} />
-          <Button label={secondary} variant="white" onPress={step === LAST ? undefined : close} />
+          <Button label={secondary} variant="white" onPress={onSecondary} />
         </View>
       </View>
     </Screen>

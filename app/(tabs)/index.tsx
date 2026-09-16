@@ -1,82 +1,129 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { memo, useMemo } from 'react';
+import { FlatList, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { Bell } from 'lucide-react-native';
-import { Body, Card, Chip, ChipTone, Display, IconButton, Pill, Screen, SectionLabel, UnreadDot } from '@/components/ui';
+import { Bell, ChevronRight, MessageCircle } from 'lucide-react-native';
+import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot } from '@/components/ui';
 import { AvatarPair, PersonAvatar } from '@/components/avatar';
-import { PhotoArt } from '@/components/art';
-import { activity, lockedMisses, nearMisses, NearMiss, people, theirPhotoColors } from '@/data/mock';
+import { MiniMap } from '@/components/art';
+import { activity, nearMisses, NearMiss, people } from '@/data/mock';
 import { isBeforeMet, useStore } from '@/state/store';
 import { colors, fonts, radius } from '@/theme';
 
-type Tab = 'all' | 'before' | 'locked';
-
+const PAD = 16;
 const openNearMiss = (id: string) => router.push({ pathname: '/near-miss/[id]', params: { id } });
 
-function NearMissCard({ nm, unread, tag }: { nm: NearMiss; unread: number; tag?: { label: string; tone: ChipTone } }) {
+type Row = { kind: 'year'; year: number } | { kind: 'post'; nm: NearMiss };
+
+const Post = memo(function Post({ nm, width, tags, unread, commentCount }: {
+  nm: NearMiss; width: number; tags: { label: string; tone: ChipTone }[]; unread: number; commentCount: number;
+}) {
   const friend = people[nm.friendId];
+  const placeShort = nm.place.split(',')[0];
+  const mapHeight = Math.round(width * 0.72);
   return (
-    <Pressable onPress={() => openNearMiss(nm.id)}>
-      <Card style={{ padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-        <AvatarPair otherId={nm.friendId} />
-        <View style={{ flex: 1, gap: 4 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-              <Body size={16} weight="bold">You + {friend.name}</Body>
-              {unread > 0 && <UnreadDot label={`${unread} new`} />}
-            </View>
-            <Body size={13} color={colors.muted}>{nm.dateShort}</Body>
+    <Pressable onPress={() => openNearMiss(nm.id)} accessibilityRole="button" accessibilityLabel={`${placeShort}, you and ${friend.name}, ${nm.dateLong}`}>
+      <View style={{ backgroundColor: colors.card, borderRadius: radius.cardLg, borderWidth: 1, borderColor: colors.cardBorder, overflow: 'hidden' }}>
+        {/* Header, like a post */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
+          <AvatarPair otherId={nm.friendId} size={34} />
+          <View style={{ flex: 1 }}>
+            <Text numberOfLines={1} style={{ fontFamily: fonts.bold, fontSize: 16, color: colors.ink }}>
+              {placeShort}
+              <Text style={{ fontFamily: fonts.semibold, color: colors.muted }}> · You + {friend.name}</Text>
+            </Text>
+            <Body size={13} color={colors.muted} numberOfLines={1}>{nm.dateLong} · {nm.time}</Body>
           </View>
-          <Body size={15} color={colors.text2}>{nm.placeFull}</Body>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 2 }}>
-            <Chip label={`${nm.distance}m apart`} />
-            {tag && <Chip label={tag.label} tone={tag.tone} />}
+          {unread > 0 && <UnreadDot label={`${unread} new`} />}
+        </View>
+
+        {/* The "photo" is the map of where you both were */}
+        <View>
+          <MiniMap width={width} height={mapHeight} distance={nm.distance} spread={Math.min(0.5, nm.distance / 180)} detail label={placeShort} />
+          <View style={{ position: 'absolute', left: 12, top: 12, backgroundColor: colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.ink }}>{nm.distance}m apart</Text>
           </View>
         </View>
-      </Card>
+
+        {/* Footer */}
+        <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 8 }}>
+          {tags.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {tags.map((t) => <Chip key={t.label} label={t.label} tone={t.tone} />)}
+            </View>
+          )}
+          <Body size={15} color={colors.text2}>
+            {nm.revealLine ?? `You were both at ${nm.placeFull}, ${nm.timeRange}.`}
+          </Body>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <MessageCircle size={16} color={colors.muted} strokeWidth={2} />
+              <Body size={14} weight="semibold" color={colors.muted}>
+                {commentCount > 0 ? `${commentCount} comment${commentCount > 1 ? 's' : ''}` : `Ask ${friend.name}: ${nm.prompt}`}
+              </Body>
+            </View>
+            <ChevronRight size={16} color={colors.faint} />
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
-}
+});
 
 export default function Feed() {
-  const [tab, setTab] = useState<Tab>('all');
+  const { width } = useWindowDimensions();
   const met = useStore((s) => s.met);
   const unread = useStore((s) => s.unread);
   const seen = useStore((s) => s.seen);
-  const shared = useStore((s) => s.shared);
-  const theyShared = useStore((s) => s.theyShared);
+  const comments = useStore((s) => s.comments);
   const activityRead = useStore((s) => s.activityRead);
+  const cardWidth = Math.min(width, 640) - PAD * 2 - 2;
 
-  const tagFor = (nm: NearMiss): { label: string; tone: ChipTone } | undefined => {
-    if (nm.isNew && !seen[nm.id]) return { label: 'New', tone: 'violet' };
-    if (nm.viaFriendId) return { label: `Friend of ${people[nm.viaFriendId].name}`, tone: 'green' };
-    if (isBeforeMet(met, nm)) return { label: 'Before you met', tone: 'coral' };
-    return undefined;
+  // Oldest first, with a year label whenever the year changes.
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
+    let year = 0;
+    for (const nm of [...nearMisses].sort((a, b) => a.date.localeCompare(b.date))) {
+      if (nm.year !== year) { year = nm.year; out.push({ kind: 'year', year }); }
+      out.push({ kind: 'post', nm });
+    }
+    return out;
+  }, []);
+
+  const tagsFor = (nm: NearMiss) => {
+    const t: { label: string; tone: ChipTone }[] = [];
+    if (nm.isNew && !seen[nm.id]) t.push({ label: 'New', tone: 'violet' });
+    if (nm.viaFriendId) t.push({ label: `Friend of ${people[nm.viaFriendId].name}`, tone: 'green' });
+    if (isBeforeMet(met, nm)) t.push({ label: 'Before you met', tone: 'coral' });
+    return t;
   };
 
-  const lists = useMemo(() => {
-    const before = nearMisses.filter((n) => isBeforeMet(met, n)).sort((a, b) => a.year - b.year);
-    // Newest first, but anything unseen or with unread activity floats to the top.
-    const score = (n: NearMiss) => (unread[n.id] ? 2 : 0) + (n.isNew && !seen[n.id] ? 1 : 0);
-    const all = [...nearMisses].sort((a, b) => score(b) - score(a) || b.year - a.year);
-    return { before, all };
-  }, [met, unread, seen]);
-
-  // "Needs you": a friend shared a photo and you haven't shared back.
-  const needsYou = nearMisses.filter((n) => theyShared[n.id] && !shared[n.id]);
   const unreadActivity = activityRead ? 0 : activity.filter((a) => a.fresh).length;
 
-  const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: 'all', label: 'All', count: lists.all.length },
-    { id: 'before', label: 'Before you met', count: lists.before.length },
-    { id: 'locked', label: 'Locked', count: lockedMisses.length },
-  ];
-  const footnotes: Record<Tab, string> = {
-    all: 'From your photos, one per night. Photos from the last 30 days are never matched.',
-    before: 'Before the first time we saw you two together.',
-    locked: 'These unlock when the other person joins.',
-  };
-  const rows = tab === 'locked' ? [] : lists[tab];
+  const header = (
+    <Pressable onPress={() => router.push('/reveal')} style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violet, gap: 12, marginBottom: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <AvatarPair otherId="maya" size={44} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Body size={14} color="rgba(255,255,255,0.85)">Maya just joined</Body>
+          <Display size={22} style={{ color: colors.white }}>You two almost met 3 times</Display>
+        </View>
+      </View>
+      <View style={{ alignSelf: 'flex-start', minHeight: 40, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.white, justifyContent: 'center' }}>
+        <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.violet }}>See them</Text>
+      </View>
+    </Pressable>
+  );
+
+  const footer = (
+    <View style={{ alignItems: 'center', gap: 6, paddingTop: 12, paddingHorizontal: 12 }}>
+      <Body size={14} color={colors.muted} style={{ textAlign: 'center' }}>
+        That's every near miss so far. More show up as friends join. Photos from the last 30 days are never matched.
+      </Body>
+      <Pressable onPress={() => router.navigate('/invite')} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+        <Body size={15} weight="bold" color={colors.violet}>Invite friends</Body>
+      </Pressable>
+    </View>
+  );
 
   return (
     <Screen>
@@ -99,78 +146,24 @@ export default function Feed() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 24, gap: 14 }}>
-        <Pressable onPress={() => router.push('/reveal')} style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violet, gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <AvatarPair otherId="maya" size={44} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Body size={14} color="rgba(255,255,255,0.85)">Maya just joined</Body>
-              <Display size={22} style={{ color: colors.white }}>You two almost met 3 times</Display>
-            </View>
-          </View>
-          <View style={{ alignSelf: 'flex-start', minHeight: 40, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.white, justifyContent: 'center' }}>
-            <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.violet }}>See them</Text>
-          </View>
-        </Pressable>
-
-        {needsYou.length > 0 && (
-          <View style={{ gap: 8 }}>
-            <SectionLabel style={{ paddingTop: 2, paddingBottom: 0 }}>Needs you</SectionLabel>
-            {needsYou.slice(0, 3).map((nm) => (
-              <Pressable key={nm.id} onPress={() => openNearMiss(nm.id)}>
-                <Card style={{ padding: 10, paddingLeft: 12, flexDirection: 'row', alignItems: 'center', gap: 12, borderColor: '#D9D0F7' }}>
-                  <View style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden' }}>
-                    <PhotoArt color={theirPhotoColors[0]} size={48} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Body size={15} weight="bold">{people[nm.friendId].name} shared a photo</Body>
-                    <Body size={13} color={colors.muted} numberOfLines={1}>
-                      {nm.place}{unread[nm.id] ? ` · ${unread[nm.id]} new replies` : ''}
-                    </Body>
-                  </View>
-                  <Pill label="Share back" onPress={() => openNearMiss(nm.id)} textSize={14} />
-                </Card>
-              </Pressable>
-            ))}
-          </View>
+      <FlatList
+        data={rows}
+        keyExtractor={(r) => (r.kind === 'year' ? `y${r.year}` : r.nm.id)}
+        ListHeaderComponent={header}
+        ListFooterComponent={footer}
+        contentContainerStyle={{ paddingHorizontal: PAD, paddingTop: 4, paddingBottom: 24, gap: 12, width: '100%', maxWidth: 640, alignSelf: 'center' }}
+        renderItem={({ item }) => item.kind === 'year' ? (
+          <Text style={{ fontFamily: fonts.display, fontSize: 20, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.year}</Text>
+        ) : (
+          <Post
+            nm={item.nm}
+            width={cardWidth}
+            tags={tagsFor(item.nm)}
+            unread={unread[item.nm.id] ?? 0}
+            commentCount={(comments[item.nm.id] ?? []).length}
+          />
         )}
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 6 }}>
-          {tabs.map((t) => {
-            const on = t.id === tab;
-            return (
-              <Pressable key={t.id} onPress={() => setTab(t.id)} accessibilityState={{ selected: on }}
-                style={{ minHeight: 40, paddingHorizontal: 12, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: on ? colors.ink : colors.white, borderWidth: 1, borderColor: on ? colors.ink : colors.inputBorder }}>
-                <Text style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? colors.white : colors.ink }}>{t.label}</Text>
-                <Text style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? 'rgba(255,255,255,0.6)' : colors.faint }}>{t.count}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {rows.map((nm) => <NearMissCard key={nm.id} nm={nm} unread={unread[nm.id] ?? 0} tag={tagFor(nm)} />)}
-
-        {tab === 'locked' && lockedMisses.map((l) => (
-          <Pressable key={l.id} onPress={() => router.navigate('/friends')}>
-            <Card style={{ padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-              <AvatarPair unknown />
-              <View style={{ flex: 1, gap: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Body size={16} weight="bold">Someone in your contacts</Body>
-                  <Body size={13} color={colors.muted}>{l.when}</Body>
-                </View>
-                <Body size={15} color={colors.text2}>{l.place}</Body>
-                <View style={{ flexDirection: 'row', gap: 6, paddingTop: 2 }}>
-                  <Chip label={`${l.distance}m apart`} />
-                  <Chip label="Invite to unlock" tone="solidViolet" onPress={() => router.navigate('/friends')} />
-                </View>
-              </View>
-            </Card>
-          </Pressable>
-        ))}
-
-        <Body size={13} color={colors.muted} style={{ textAlign: 'center', paddingHorizontal: 12 }}>{footnotes[tab]}</Body>
-      </ScrollView>
+      />
     </Screen>
   );
 }

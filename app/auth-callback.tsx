@@ -8,7 +8,7 @@ import { colors } from '@/theme';
 // then we hand off to profile setup (new people) or the app (returning people).
 export default function AuthCallback() {
   const { signedIn, userLoaded, onboarded, linkError } = useAuth();
-  if (signedIn && userLoaded) return <Redirect href={onboarded ? '/' : '/profile'} />;
+  if (signedIn && userLoaded) return <Redirect href={onboarded ? '/' : '/scan'} />;
   if (!signedIn && linkError) return <Redirect href="/email" />;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.bg }}>

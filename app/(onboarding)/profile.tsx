@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Camera, ChevronLeft } from 'lucide-react-native';
-import { Body, Button, Display, IconButton, ProgressDots, Screen, TextLink } from '@/components/ui';
+import { ChevronLeft } from 'lucide-react-native';
+import { Body, Button, Display, IconButton, ProgressDots, Screen } from '@/components/ui';
+import { AvatarPicker } from '@/components/AvatarPicker';
 import { colors, fonts, radius } from '@/theme';
 import { errorMessage, useAuth } from '@/lib/auth';
 
@@ -27,7 +28,7 @@ function Field({ label, value, onChangeText, placeholder, prefix }: { label: str
 }
 
 export default function Profile() {
-  const { profile, saveProfile, signOut } = useAuth();
+  const { profile, saveProfile } = useAuth();
   const [username, setUsername] = useState(profile?.username ?? '');
   const [name, setName] = useState(profile?.name ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
@@ -39,7 +40,7 @@ export default function Profile() {
     setBusy(true); setError('');
     try {
       await saveProfile({ username, name, bio });
-      router.push('/scan');
+      router.push('/find-friends');
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -51,16 +52,13 @@ export default function Profile() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 24 }} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <IconButton label="Sign out" onPress={signOut}><ChevronLeft size={20} color={colors.ink} /></IconButton>
-            <ProgressDots total={3} active={1} />
+            <IconButton label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/scan'))}><ChevronLeft size={20} color={colors.ink} /></IconButton>
+            <ProgressDots total={3} active={2} />
             <View style={{ width: 44 }} />
           </View>
           <Display size={32}>Make your profile</Display>
-          <View style={{ alignItems: 'center', gap: 6 }}>
-            <Pressable accessibilityLabel="Add photo" style={{ width: 104, height: 104, borderRadius: 52, backgroundColor: colors.white, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.toggleOff, alignItems: 'center', justifyContent: 'center' }}>
-              <Camera size={30} color={colors.muted} strokeWidth={1.6} />
-            </Pressable>
-            <TextLink label="Add photo" />
+          <View style={{ alignItems: 'center', gap: 2 }}>
+            <AvatarPicker />
             <Body size={13} color={colors.muted}>Optional. You can add one later.</Body>
           </View>
           <View style={{ gap: 16 }}>

@@ -49,9 +49,10 @@ share-card capture, Apple and Google sign-in.
 
 ```
 app/                    Screens (Expo Router: file name = route)
-  (auth)/               welcome, email code sign-in
-  (onboarding)/         profile → scan → find-friends
-  (tabs)/               Near misses feed, Friends, You (settings)
+  (auth)/               welcome, email link sign-in
+  (onboarding)/         scan → profile → find-friends
+  (tabs)/               Invite, Near misses (timeline, center tab), You (settings)
+  places.tsx            Hidden places (home, work, ...)
   activity.tsx          Bell → activity list
   reveal.tsx            "Maya just joined" reveal
   near-miss/[id].tsx    One near miss: map, photos, comments
@@ -60,7 +61,10 @@ src/
   theme.ts              Colors, fonts, radii (the design system)
   components/           Buttons, cards, chips, avatars, maps, illustrations
   lib/supabase.ts       Supabase client
-  lib/auth.tsx          Sign-in, profile, settings (saved to Supabase)
+  lib/auth.tsx          Sign-in, profile, photo, settings (saved to Supabase)
+  lib/photoScan.ts      Reads photo times/places, saves to location_points
+  lib/places.ts         Hidden places (hidden_zones)
+  state/scan.ts         The running scan, shared by onboarding and You
   data/mock.ts          Sample near misses and friends (replaced in steps 3–7)
   state/store.ts        Local state for the sample data (zustand)
 ```
@@ -69,12 +73,23 @@ src/
 
 1. ✅ All screens, clickable, on sample data
 2. ✅ Auth + profiles + Supabase schema, automatic updates
-3. Photo scan (real `expo-media-library`) → moments → upload
+3. ✅ Photo scan (real `expo-media-library`) → moments → upload, profile photo, hidden places
 4. Contacts matching, invites, share sheet
 5. Matching function, feed, near miss page, reveal
 6. Photo sharing, comments, friend page
 7. Activity, read state, push notifications, weekly report, feedback
-8. Background location (development build), delay, hidden places
+8. (Background location and delay are out of the MVP)
 9. Share card export, polish, App Store checklist
 
-Sign-in, profiles and settings are real. Near misses, friends and photos are still sample data.
+Sign-in, profiles, profile photos, settings, hidden places and the photo scan are real.
+Near misses, friends and shared photos are still sample data.
+
+### Checking a scan landed in the database
+
+In the Supabase SQL editor:
+
+```sql
+select count(*), min(at), max(at) from location_points;  -- one row per photo with a place
+select count(*) from moments;                             -- photos grouped by time and place
+select label, radius_m from hidden_zones;
+```

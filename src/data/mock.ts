@@ -34,6 +34,7 @@ export type NearMiss = {
   friendId: string;
   place: string;
   placeFull: string;
+  date: string; // YYYY-MM-DD, for ordering
   dateShort: string;
   dateLong: string;
   time: string;
@@ -49,39 +50,39 @@ export type NearMiss = {
 export const nearMisses: NearMiss[] = [
   {
     id: 'dolores', friendId: 'maya', place: 'Dolores Park', placeFull: 'Dolores Park, SF',
-    dateShort: 'Jul 17, 2021', dateLong: 'Sat, Jul 17, 2021', time: '3:20pm', timeRange: '3:05 to 3:35pm', year: 2021, distance: 80, isNew: true,
+    date: '2021-07-17', dateShort: 'Jul 17, 2021', dateLong: 'Sat, Jul 17, 2021', time: '3:20pm', timeRange: '3:05 to 3:35pm', year: 2021, distance: 80, isNew: true,
     revealLine: 'Two years after you met. Opposite ends of the park, and neither of you knew.',
     prompt: 'which side of the park were you on?',
   },
   {
     id: 'bluebottle', friendId: 'leo', place: 'Blue Bottle, Hayes Valley', placeFull: 'Blue Bottle, Hayes Valley',
-    dateShort: 'Mar 2, 2025', dateLong: 'Sun, Mar 2, 2025', time: '8:05am', timeRange: '7:55 to 8:20am', year: 2025, distance: 45, viaFriendId: 'sam', isNew: true,
+    date: '2025-03-02', dateShort: 'Mar 2, 2025', dateLong: 'Sun, Mar 2, 2025', time: '8:05am', timeRange: '7:55 to 8:20am', year: 2025, distance: 45, viaFriendId: 'sam', isNew: true,
     prompt: 'what did you order?',
   },
   {
     id: 'les', friendId: 'sam', place: 'Lower East Side, New York', placeFull: 'Lower East Side, New York',
-    dateShort: 'Oct 3, 2024', dateLong: 'Thu, Oct 3, 2024', time: '11:48pm', timeRange: '11:30pm to 12:10am', year: 2024, distance: 90,
+    date: '2024-10-03', dateShort: 'Oct 3, 2024', dateLong: 'Thu, Oct 3, 2024', time: '11:48pm', timeRange: '11:30pm to 12:10am', year: 2024, distance: 90,
     prompt: 'what were you doing in New York?',
   },
   {
     id: 'sfo', friendId: 'priya', place: 'SFO Terminal 2', placeFull: 'SFO Terminal 2',
-    dateShort: 'Jan 8, 2023', dateLong: 'Sun, Jan 8, 2023', time: '7:05am', timeRange: '6:50 to 7:20am', year: 2023, distance: 35,
+    date: '2023-01-08', dateShort: 'Jan 8, 2023', dateLong: 'Sun, Jan 8, 2023', time: '7:05am', timeRange: '6:50 to 7:20am', year: 2023, distance: 35,
     prompt: 'where were you flying?',
   },
   {
     id: 'outsidelands', friendId: 'sam', place: 'Outside Lands', placeFull: 'Outside Lands, Golden Gate Park',
-    dateShort: 'Aug 10, 2019', dateLong: 'Sat, Aug 10, 2019', time: '6:12pm', timeRange: '5:50 to 6:30pm', year: 2019, distance: 60,
+    date: '2019-08-10', dateShort: 'Aug 10, 2019', dateLong: 'Sat, Aug 10, 2019', time: '6:12pm', timeRange: '5:50 to 6:30pm', year: 2019, distance: 60,
     prompt: 'which stage were you at?',
   },
   {
     id: 'tartine', friendId: 'maya', place: 'Tartine, Mission', placeFull: 'Tartine, Mission District',
-    dateShort: 'May 20, 2018', dateLong: 'Sun, May 20, 2018', time: '10:12am', timeRange: '9:55 to 10:30am', year: 2018, distance: 50,
+    date: '2018-05-20', dateShort: 'May 20, 2018', dateLong: 'Sun, May 20, 2018', time: '10:12am', timeRange: '9:55 to 10:30am', year: 2018, distance: 50,
     revealLine: 'Same brunch line, one Sunday morning. A year before you met.',
     prompt: 'what did you get?',
   },
   {
     id: 'fillmore', friendId: 'maya', place: 'The Fillmore', placeFull: 'The Fillmore, San Francisco',
-    dateShort: 'Mar 4, 2016', dateLong: 'Fri, Mar 4, 2016', time: '9:41pm', timeRange: '9:20 to 9:50pm', year: 2016, distance: 22,
+    date: '2016-03-04', dateShort: 'Mar 4, 2016', dateLong: 'Fri, Mar 4, 2016', time: '9:41pm', timeRange: '9:20 to 9:50pm', year: 2016, distance: 22,
     revealLine: 'Same show. You were by the soundboard, Maya was up in the balcony.',
     prompt: 'were you there for the encore?',
   },

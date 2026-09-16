@@ -45,6 +45,11 @@ function RootNavigator() {
         <Stack.Screen name="(onboarding)" />
       </Stack.Protected>
 
+      {/* Hidden places: reachable from the scan step and from the You tab */}
+      <Stack.Protected guard={signedIn}>
+        <Stack.Screen name="places" />
+      </Stack.Protected>
+
       {/* The app */}
       <Stack.Protected guard={signedIn && onboarded}>
         <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
