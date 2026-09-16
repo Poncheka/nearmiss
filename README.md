@@ -20,6 +20,17 @@ Press `w` in the terminal to open it in a browser instead.
 Sign in with Apple or an emailed code. While developing, "Look around with sample data" on the
 welcome screen skips sign-in.
 
+## When do I need a new build?
+
+Only when **native** code changes: a new package with native code (`npx expo install ...` of a module like
+location, camera or sign-in), or a change to `plugins` / `ios` / `android` in `app.json`.
+Everything else (screens, logic, styling) reaches the installed app live from `npx expo start`,
+or through the automatic update on push.
+
+The current development build already includes everything planned for steps 3–8: photo library,
+background location, contacts, notifications, image picker, maps, clipboard, sharing, haptics,
+share-card capture, Apple and Google sign-in.
+
 ## Automatic updates (EAS Workflows)
 
 - **Push to `main`** → `.eas/workflows/update-on-push.yml` sends an over-the-air update to installed test builds.

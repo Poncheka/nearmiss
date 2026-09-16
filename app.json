@@ -45,6 +45,49 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.75590594065-kba7va53qrukb9ij209qmhci9v6n2pjc"
         }
+      ],
+      "expo-image",
+      "expo-sharing",
+      "expo-web-browser",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Near Miss reads the time and place of your photos to find times you almost crossed paths with friends. Photos stay on your phone unless you choose to share one.",
+          "savePhotosPermission": "Near Miss saves share cards to your photos when you ask it to.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Near Miss uses your location in the background to find new near misses. Friends only see them after your chosen delay, and never at home or work.",
+          "locationAlwaysPermission": "Near Miss uses your location in the background to find new near misses. Friends only see them after your chosen delay, and never at home or work.",
+          "locationWhenInUsePermission": "Near Miss uses your location to find new near misses with friends.",
+          "motionUsagePermission": false,
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Near Miss checks which of your contacts are on the app so you can add them. Your contact list is never uploaded."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#5B3FD0"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Near Miss reads the time and place of your photos to find times you almost crossed paths with friends. Photos stay on your phone unless you choose to share one.",
+          "cameraPermission": "Near Miss uses the camera if you take a new profile photo.",
+          "microphonePermission": false
+        }
       ]
     ],
     "scheme": "nearmiss",
