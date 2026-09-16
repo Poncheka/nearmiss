@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (!credential.identityToken) throw new UserFacingError('Apple did not return a sign-in token. Try again.');
     const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token: credential.identityToken });
-    if (error) throw new UserFacingError(error.message);
+    if (error) throw new UserFacingError(`Supabase: ${error.message}`);
     // Apple only shares the name on the very first sign-in.
     const given = credential.fullName?.givenName;
     if (given && data.user) {

@@ -9,12 +9,18 @@ import { colors, radius } from '@/theme';
 
 export default function Welcome() {
   const { signInWithApple, startDemo } = useAuth();
-  const [appleAvailable, setAppleAvailable] = useState(false);
+  // null = still checking. On iPhone we always offer Apple; if the native button isn't available
+  // (it sometimes isn't inside Expo Go) we show our own button and surface any error.
+  const [nativeApple, setNativeApple] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
+  const isIOS = Platform.OS === 'ios';
 
   useEffect(() => {
-    if (Platform.OS === 'ios') AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false));
-  }, []);
+    if (!isIOS) return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setNativeApple)
+      .catch((e) => { console.warn('Apple sign-in availability check failed', e); setNativeApple(false); });
+  }, [isIOS]);
 
   const apple = async () => {
     if (busy) return;
@@ -22,7 +28,9 @@ export default function Welcome() {
     try {
       await signInWithApple();
     } catch (e) {
-      Alert.alert("Couldn't sign in with Apple", errorMessage(e));
+      console.warn('Apple sign-in failed', e);
+      const detail = e instanceof Error ? e.message : String(e);
+      Alert.alert("Couldn't sign in with Apple", errorMessage(e) === 'Something went wrong. Please try again.' ? detail : errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -40,7 +48,7 @@ export default function Welcome() {
           <Body size={17} color={colors.text2}>See the times you and your friends were steps apart, sometimes years before you met.</Body>
         </View>
         <View style={{ gap: 10, paddingTop: 28 }}>
-          {appleAvailable && (
+          {isIOS && nativeApple === true && (
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
               buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
@@ -49,7 +57,8 @@ export default function Welcome() {
               onPress={apple}
             />
           )}
-          <Button label="Continue with email" variant={appleAvailable ? 'white' : 'ink'} onPress={() => router.push('/email')} />
+          {isIOS && nativeApple === false && <Button label="Continue with Apple" variant="ink" onPress={apple} />}
+          <Button label="Continue with email" variant={isIOS ? 'white' : 'ink'} onPress={() => router.push('/email')} />
           {__DEV__ && <Button label="Look around with sample data" variant="text" onPress={startDemo} />}
           <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
             <Body size={13} color={colors.muted}>18+ only ·</Body>
