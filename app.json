@@ -39,6 +39,13 @@
     "scheme": "nearmiss",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e5772c6d-a25d-4ff1-ad3a-e797e80a0ede"
+      }
+    },
+    "owner": "poncheka"
   }
 }
