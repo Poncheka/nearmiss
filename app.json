@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Near Miss",
+    "slug": "nearmiss",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.poncheka.nearmiss"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F2EA",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.poncheka.nearmiss"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F2EA",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160
+        }
+      ]
+    ],
+    "scheme": "nearmiss",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
