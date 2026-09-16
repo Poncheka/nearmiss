@@ -12,7 +12,7 @@ const inputStyle = {
 } as const;
 
 export default function EmailSignIn() {
-  const { sendEmailCode, verifyEmailCode } = useAuth();
+  const { sendEmailCode, verifyEmailCode, linkError } = useAuth();
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -57,7 +57,7 @@ export default function EmailSignIn() {
           {step === 'email' ? (
             <View style={{ gap: 14 }}>
               <Display size={32}>What's your email?</Display>
-              <Body size={16} color={colors.text2}>We'll send you a 6-digit code. No password needed.</Body>
+              <Body size={16} color={colors.text2}>We'll email you a sign-in link. No password needed.</Body>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -75,7 +75,7 @@ export default function EmailSignIn() {
           ) : (
             <View style={{ gap: 14 }}>
               <Display size={32}>Check your email</Display>
-              <Body size={16} color={colors.text2}>Enter the 6-digit code we sent to {email.trim()}.</Body>
+              <Body size={16} color={colors.text2}>Open the email we sent to {email.trim()} on this phone and tap the sign-in link. If your email has a 6-digit code instead, enter it here.</Body>
               <TextInput
                 value={code}
                 onChangeText={(t) => {
@@ -91,16 +91,16 @@ export default function EmailSignIn() {
                 placeholderTextColor={colors.faint}
                 style={[inputStyle, { fontSize: 28, letterSpacing: 8, textAlign: 'center', fontFamily: fonts.semibold }]}
               />
-              <TextLink label="Send a new code" size={15} onPress={send} style={{ alignSelf: 'center' }} />
+              <TextLink label="Send another email" size={15} onPress={send} style={{ alignSelf: 'center' }} />
             </View>
           )}
 
-          {error ? <Body size={14} color={colors.danger}>{error}</Body> : null}
+          {error || linkError ? <Body size={14} color={colors.danger}>{error || linkError}</Body> : null}
           <View style={{ flex: 1 }} />
           {busy ? (
             <View style={{ height: 54, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.violet} /></View>
           ) : step === 'email' ? (
-            <Button label="Send code" onPress={send} variant={validEmail ? 'violet' : 'sand'} />
+            <Button label="Email me a link" onPress={send} variant={validEmail ? 'violet' : 'sand'} />
           ) : (
             <Button label="Continue" onPress={() => verify()} variant={code.length === 6 ? 'violet' : 'sand'} />
           )}

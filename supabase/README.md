@@ -17,11 +17,16 @@ versions recorded in Supabase, so the Supabase CLI (`supabase db push`) sees the
 
 ## One-time dashboard setup
 
-1. **Email code sign-in:** Authentication → Emails → *Magic Link* template. Replace the body with:
-   ```html
-   <h2>Your Near Miss code</h2>
-   <p>Enter this code in the app: <strong>{{ .Token }}</strong></p>
-   ```
+1. **Email sign-in links:** Authentication → URL Configuration → *Redirect URLs* → add
+   `exp://**` (Expo Go while developing) and `nearmiss://**` (installed builds).
+   The default "Magic link" email then opens the app signed in.
 2. **Sign in with Apple:** Authentication → Sign In / Providers → Apple → enable, and under *Client IDs* enter
    `com.poncheka.nearmiss,host.exp.Exponent` (the second one lets it work inside Expo Go). Leave the secret empty:
    the app uses Apple's native sign-in, which doesn't need one.
+
+## Before inviting other people
+
+Supabase's built-in email only delivers to members of this Supabase account and is heavily rate-limited.
+Before inviting testers, connect a custom SMTP provider (for example Resend, with our own domain) under
+Authentication → Emails → SMTP. Custom SMTP also unlocks template editing, so the email can include the
+6-digit code (`{{ .Token }}`), which the app already accepts.

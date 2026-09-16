@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Linking from 'expo-linking';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -46,7 +47,9 @@ type AuthState = {
   settings: Settings;
   onboarded: boolean;
   signInWithApple: () => Promise<void>;
+  /** Emails a sign-in link (and a 6-digit code once custom email templates are set up). */
   sendEmailCode: (email: string) => Promise<void>;
+  linkError: string;
   verifyEmailCode: (email: string, code: string) => Promise<void>;
   startDemo: () => void;
   signOut: () => Promise<void>;
@@ -67,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [demo, setDemo] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [linkError, setLinkError] = useState('');
 
   const loadUser = useCallback(async (userId: string) => {
     const [p, s] = await Promise.all([
@@ -93,6 +97,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, [loadUser]);
 
+  // Sign-in links from email open the app with the session tokens in the URL fragment.
+  useEffect(() => {
+    const handle = async (url: string | null) => {
+      if (!url || !url.includes('#')) return;
+      const params = new URLSearchParams(url.split('#')[1]);
+      const error = params.get('error_description');
+      if (error) { setLinkError(error.replace(/\+/g, ' ')); return; }
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+      if (!access_token || !refresh_token) return;
+      const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
+      setLinkError(sessionError ? sessionError.message : '');
+    };
+    Linking.getInitialURL().then(handle);
+    const sub = Linking.addEventListener('url', ({ url }) => handle(url));
+    return () => sub.remove();
+  }, []);
+
   const signInWithApple = useCallback(async () => {
     if (Platform.OS !== 'ios') throw new UserFacingError('Sign in with Apple is only available on iPhone. Use email instead.');
     let credential: AppleAuthentication.AppleAuthenticationCredential;
@@ -117,7 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendEmailCode = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } });
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { shouldCreateUser: true, emailRedirectTo: Linking.createURL('auth-callback') },
+    });
     if (error) throw new UserFacingError(error.message);
   }, []);
 
@@ -176,13 +201,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onboarded: !!settings.onboarded_at,
     signInWithApple,
     sendEmailCode,
+    linkError,
     verifyEmailCode,
     startDemo,
     signOut,
     saveProfile,
     updateSettings,
     finishOnboarding,
-  }), [loading, demo, session, profile, settings, signInWithApple, sendEmailCode, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
+  }), [loading, demo, session, profile, settings, signInWithApple, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -26,6 +26,9 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      {/* Email sign-in links open here, signed in or not */}
+      <Stack.Screen name="auth-callback" />
+
       {/* Signed out: welcome + email sign-in */}
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />
