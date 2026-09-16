@@ -2,20 +2,18 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Body, Button, Display, Screen, TextLink } from '@/components/ui';
 import { WelcomeArt } from '@/components/art';
-import { errorMessage, useAuth } from '@/lib/auth';
+import { errorMessage, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
 import { colors, radius } from '@/theme';
 
 export default function Welcome() {
-  const { signInWithApple, startDemo } = useAuth();
+  const { signInWithApple, signInWithGoogle, startDemo } = useAuth();
   // null = still checking. On iPhone we always offer Apple; if the native button isn't available
   // (it sometimes isn't inside Expo Go) we show our own button and surface any error.
   const [nativeApple, setNativeApple] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  // Apple sign-in isn't included in Expo Go; it works in development and App Store builds.
-  const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  // Apple and Google sign-in aren't included in Expo Go; they work in development and App Store builds.
   const isIOS = Platform.OS === 'ios' && !inExpoGo;
 
   useEffect(() => {
@@ -25,19 +23,21 @@ export default function Welcome() {
       .catch((e) => { console.warn('Apple sign-in availability check failed', e); setNativeApple(false); });
   }, [isIOS]);
 
-  const apple = async () => {
+  const run = (name: string, fn: () => Promise<void>) => async () => {
     if (busy) return;
     setBusy(true);
     try {
-      await signInWithApple();
+      await fn();
     } catch (e) {
-      console.warn('Apple sign-in failed', e);
+      console.warn(`${name} sign-in failed`, e);
       const detail = e instanceof Error ? e.message : String(e);
-      Alert.alert("Couldn't sign in with Apple", errorMessage(e) === 'Something went wrong. Please try again.' ? detail : errorMessage(e));
+      Alert.alert(`Couldn't sign in with ${name}`, errorMessage(e) === 'Something went wrong. Please try again.' ? detail : errorMessage(e));
     } finally {
       setBusy(false);
     }
   };
+  const apple = run('Apple', signInWithApple);
+  const google = run('Google', signInWithGoogle);
 
   return (
     <Screen edges={['top', 'bottom']}>
@@ -61,10 +61,11 @@ export default function Welcome() {
             />
           )}
           {isIOS && nativeApple === false && <Button label="Continue with Apple" variant="ink" onPress={apple} />}
-          <Button label="Continue with email" variant={isIOS ? 'white' : 'ink'} onPress={() => router.push('/email')} />
+          {googleAvailable && <Button label="Continue with Google" variant="white" onPress={google} />}
+          <Button label="Continue with email" variant={isIOS || googleAvailable ? 'white' : 'ink'} onPress={() => router.push('/email')} />
           {__DEV__ && <Button label="Look around with sample data" variant="text" onPress={startDemo} />}
-          {inExpoGo && Platform.OS === 'ios' && (
-            <Body size={12} color={colors.muted} style={{ textAlign: 'center' }}>Apple sign-in appears in the installed Near Miss app, not in Expo Go.</Body>
+          {inExpoGo && (
+            <Body size={12} color={colors.muted} style={{ textAlign: 'center' }}>Apple and Google sign-in appear in the installed Near Miss app, not in Expo Go.</Body>
           )}
           <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
             <Body size={13} color={colors.muted}>18+ only ·</Body>

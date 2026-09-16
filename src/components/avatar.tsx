@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { colors, fonts } from '@/theme';
 import { me, people } from '@/data/mock';
 import { useAuth } from '@/lib/auth';
@@ -23,6 +23,14 @@ export function Avatar({ initial, color, size = 40, ring = false, dashed = false
 export function PersonAvatar({ id, size = 40, ring = false }: { id: string; size?: number; ring?: boolean }) {
   const { profile } = useAuth();
   if (id === 'jeff') {
+    if (profile?.avatar_url) {
+      return (
+        <Image
+          source={{ uri: profile.avatar_url }}
+          style={{ width: size, height: size, borderRadius: size / 2, borderWidth: ring ? 2 : 0, borderColor: colors.white }}
+        />
+      );
+    }
     const initial = (profile?.name || profile?.username || me.initial).charAt(0).toUpperCase();
     return <Avatar initial={initial} color={me.color} size={size} ring={ring} />;
   }

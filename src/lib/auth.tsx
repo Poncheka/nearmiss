@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Linking from 'expo-linking';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -47,6 +48,7 @@ type AuthState = {
   settings: Settings;
   onboarded: boolean;
   signInWithApple: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   /** Emails a sign-in link (and a 6-digit code once custom email templates are set up). */
   sendEmailCode: (email: string) => Promise<void>;
   linkError: string;
@@ -61,6 +63,26 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 export class UserFacingError extends Error {}
+
+// Google OAuth client IDs (public identifiers, not secrets).
+const GOOGLE_WEB_CLIENT_ID = '75590594065-1trkfq5u9lujqk0l8ggnddk3cd179ph9.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID = '75590594065-kba7va53qrukb9ij209qmhci9v6n2pjc.apps.googleusercontent.com';
+
+/** Native Google/Apple sign-in need our own build; Expo Go doesn't include them. */
+export const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+export const googleAvailable = !inExpoGo && Platform.OS !== 'web';
+
+// Loaded lazily so Expo Go (which lacks the native module) doesn't crash on import.
+type GoogleModule = typeof import('@react-native-google-signin/google-signin');
+let googleModule: GoogleModule | null = null;
+function getGoogle(): GoogleModule {
+  if (!googleModule) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    googleModule = require('@react-native-google-signin/google-signin') as GoogleModule;
+    googleModule.GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID, iosClientId: GOOGLE_IOS_CLIENT_ID });
+  }
+  return googleModule;
+}
 
 const demoProfile: Profile = { id: 'demo', username: 'jeff', name: 'Jeff', bio: 'SF. Always at the show.', avatar_url: null };
 
@@ -138,6 +160,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!googleAvailable) throw new UserFacingError('Google sign-in works in the installed Near Miss app, not in Expo Go.');
+    const { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } = getGoogle();
+    let idToken: string | null = null;
+    let google: { givenName: string | null; photo: string | null } | null = null;
+    try {
+      await GoogleSignin.hasPlayServices();
+      const res = await GoogleSignin.signIn();
+      if (!isSuccessResponse(res)) return; // cancelled
+      idToken = res.data.idToken;
+      google = { givenName: res.data.user.givenName, photo: res.data.user.photo };
+    } catch (e) {
+      if (isErrorWithCode(e) && (e.code === statusCodes.SIGN_IN_CANCELLED || e.code === statusCodes.IN_PROGRESS)) return;
+      if (isErrorWithCode(e) && e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) throw new UserFacingError('Google Play Services is missing or out of date.');
+      throw new UserFacingError(`Google: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!idToken) throw new UserFacingError('Google did not return a sign-in token. Try again.');
+    const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
+    if (error) throw new UserFacingError(`Supabase: ${error.message}`);
+    // Fill in name and photo from Google if the profile doesn't have them yet.
+    if (data.user && google) {
+      if (google.givenName) await supabase.from('profiles').update({ name: google.givenName }).eq('id', data.user.id).is('name', null);
+      if (google.photo) await supabase.from('profiles').update({ avatar_url: google.photo }).eq('id', data.user.id).is('avatar_url', null);
+      await loadUser(data.user.id);
+    }
+  }, [loadUser]);
+
   const sendEmailCode = useCallback(async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
@@ -159,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (demo) { setDemo(false); setProfile(null); setSettings(defaultSettings); return; }
+    if (googleAvailable && googleModule) await googleModule.GoogleSignin.signOut().catch(() => {});
     await supabase.auth.signOut();
   }, [demo]);
 
@@ -200,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     settings,
     onboarded: !!settings.onboarded_at,
     signInWithApple,
+    signInWithGoogle,
     sendEmailCode,
     linkError,
     verifyEmailCode,
@@ -208,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveProfile,
     updateSettings,
     finishOnboarding,
-  }), [loading, demo, session, profile, settings, signInWithApple, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
+  }), [loading, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -39,7 +39,13 @@
           "imageWidth": 160
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.75590594065-kba7va53qrukb9ij209qmhci9v6n2pjc"
+        }
+      ]
     ],
     "scheme": "nearmiss",
     "experiments": {
