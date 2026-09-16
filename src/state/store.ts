@@ -10,16 +10,11 @@ import {
   yearOf,
 } from '@/data/mock';
 
-export type Audience = 'friends' | 'fof' | 'everyone';
-export type Delay = '3d' | '1w' | '2w' | '1m';
-export type NotifKey = 'photos' | 'replies' | 'joins' | 'report' | 'anniv';
 
 type MetDate = { label: string; by: 'auto' | 'me' | 'them' };
 
 type State = {
   // onboarding
-  onboarded: boolean;
-  finishOnboarding: () => void;
   addedFriends: Record<string, boolean>;
   invitesSent: Record<string, boolean>;
   // near miss interaction
@@ -32,11 +27,6 @@ type State = {
   feedback: Record<string, string>;
   met: Record<string, MetDate>;
   activityRead: boolean;
-  // settings
-  audience: Audience;
-  delay: Delay;
-  backgroundLocation: boolean;
-  notifs: Record<NotifKey, boolean>;
 
   addFriend: (id: string) => void;
   sendInvite: (id: string) => void;
@@ -48,15 +38,9 @@ type State = {
   giveFeedback: (id: string, kind: string) => void;
   setMet: (friendId: string, label: string) => void;
   markActivityRead: () => void;
-  setAudience: (a: Audience) => void;
-  setDelay: (d: Delay) => void;
-  toggleBackgroundLocation: () => void;
-  toggleNotif: (k: NotifKey) => void;
 };
 
 export const useStore = create<State>((set, get) => ({
-  onboarded: false,
-  finishOnboarding: () => set({ onboarded: true }),
   addedFriends: { sam: true },
   invitesSent: {},
   unread: { ...initialUnread },
@@ -68,10 +52,6 @@ export const useStore = create<State>((set, get) => ({
   feedback: {},
   met: { ...initialMet },
   activityRead: false,
-  audience: 'fof',
-  delay: '3d',
-  backgroundLocation: true,
-  notifs: { photos: true, replies: true, joins: true, report: true, anniv: false },
 
   addFriend: (id) => set((s) => ({ addedFriends: { ...s.addedFriends, [id]: true } })),
   sendInvite: (id) => set((s) => ({ invitesSent: { ...s.invitesSent, [id]: true } })),
@@ -99,12 +79,6 @@ export const useStore = create<State>((set, get) => ({
   giveFeedback: (id, kind) => set((s) => ({ feedback: { ...s.feedback, [id]: kind } })),
   setMet: (friendId, label) => set((s) => ({ met: { ...s.met, [friendId]: { label, by: 'me' } } })),
   markActivityRead: () => set({ activityRead: true }),
-  setAudience: (audience) =>
-    set((s) => ({ audience, delay: audience === 'everyone' && s.delay === '3d' ? '1w' : s.delay })),
-  setDelay: (delay) =>
-    set((s) => (s.audience === 'everyone' && delay === '3d' ? {} : { delay })),
-  toggleBackgroundLocation: () => set((s) => ({ backgroundLocation: !s.backgroundLocation })),
-  toggleNotif: (k) => set((s) => ({ notifs: { ...s.notifs, [k]: !s.notifs[k] } })),
 }));
 
 // ---- derived helpers ----
@@ -122,5 +96,3 @@ export const yearsBeforeMet = (met: Record<string, MetDate>, nm: NearMiss) => {
 };
 
 export const getNearMiss = (id: string) => nearMisses.find((n) => n.id === id);
-
-export const delayLabel: Record<Delay, string> = { '3d': '3 days', '1w': '1 week', '2w': '2 weeks', '1m': '1 month' };

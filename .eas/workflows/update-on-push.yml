@@ -1,0 +1,16 @@
+name: Send update to test builds
+
+# Every push to main sends an over-the-air update to installed test builds
+# (builds made with the "preview" profile listen on the "preview" channel).
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  publish_update:
+    name: Publish over-the-air update
+    type: update
+    environment: preview
+    params:
+      channel: preview
+      platform: all

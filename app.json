@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.poncheka.nearmiss"
+      "bundleIdentifier": "com.poncheka.nearmiss",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -34,7 +35,8 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 160
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "scheme": "nearmiss",
     "experiments": {
@@ -46,6 +48,12 @@
         "projectId": "e5772c6d-a25d-4ff1-ad3a-e797e80a0ede"
       }
     },
-    "owner": "poncheka"
+    "owner": "poncheka",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e5772c6d-a25d-4ff1-ad3a-e797e80a0ede"
+    }
   }
 }

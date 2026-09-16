@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { colors, fonts } from '@/theme';
 import { me, people } from '@/data/mock';
+import { useAuth } from '@/lib/auth';
 
 export function Avatar({ initial, color, size = 40, ring = false, dashed = false }: {
   initial: string; color: string; size?: number; ring?: boolean; dashed?: boolean;
@@ -20,7 +21,12 @@ export function Avatar({ initial, color, size = 40, ring = false, dashed = false
 }
 
 export function PersonAvatar({ id, size = 40, ring = false }: { id: string; size?: number; ring?: boolean }) {
-  const p = id === 'jeff' ? me : people[id];
+  const { profile } = useAuth();
+  if (id === 'jeff') {
+    const initial = (profile?.name || profile?.username || me.initial).charAt(0).toUpperCase();
+    return <Avatar initial={initial} color={me.color} size={size} ring={ring} />;
+  }
+  const p = people[id];
   if (!p) return <Avatar initial="?" color={colors.sand} size={size} ring={ring} />;
   return <Avatar initial={p.initial} color={p.color} size={size} ring={ring} />;
 }

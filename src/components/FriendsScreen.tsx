@@ -6,6 +6,7 @@ import { Body, Card, Display, Pill, ProgressDots, Screen, SectionLabel } from '@
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
 import { useStore } from '@/state/store';
+import { useAuth } from '@/lib/auth';
 import { colors, fonts, radius } from '@/theme';
 
 const TOTAL_CONTACTS = 412;
@@ -18,7 +19,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const sent = useStore((s) => s.invitesSent);
   const addFriend = useStore((s) => s.addFriend);
   const sendInvite = useStore((s) => s.sendInvite);
-  const finishOnboarding = useStore((s) => s.finishOnboarding);
+  const { finishOnboarding } = useAuth();
 
   const query = q.trim().toLowerCase();
   const onApp = useMemo(
@@ -29,7 +30,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     () => inviteContacts.filter((c) => !query || c.name.toLowerCase().includes(query)),
     [query],
   );
-  const noResults = query && !onApp.length && !invite.length;
+  const noResults = query.length > 0 && onApp.length === 0 && invite.length === 0;
 
   return (
     <Screen>
@@ -39,7 +40,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
           {onboarding && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <ProgressDots total={3} active={3} />
-              <Pill label="Next" variant="ink" height={40} onPress={() => { finishOnboarding(); router.replace('/'); }} />
+              <Pill label="Next" variant="ink" height={40} onPress={() => finishOnboarding().then(() => router.replace('/'))} />
             </View>
           )}
         </View>

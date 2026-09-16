@@ -3,7 +3,7 @@
 See every time you and your friends almost crossed paths, sometimes years before you met.
 
 - **App:** React Native + Expo SDK 57 (TypeScript, Expo Router)
-- **Backend:** Supabase (Postgres + PostGIS, Auth, Storage, Edge Functions), coming in step 2
+- **Backend:** Supabase (Postgres + PostGIS, Auth, Storage). See `supabase/README.md`.
 
 ## Run it on your phone
 
@@ -17,11 +17,21 @@ See every time you and your friends almost crossed paths, sometimes years before
 
 Press `w` in the terminal to open it in a browser instead.
 
+Sign in with Apple or an emailed code. While developing, "Look around with sample data" on the
+welcome screen skips sign-in.
+
+## Automatic updates (EAS Workflows)
+
+- **Push to `main`** → `.eas/workflows/update-on-push.yml` sends an over-the-air update to installed test builds.
+- **Push a tag like `v0.1.0`** (or start it on expo.dev) → `.eas/workflows/release-testflight.yml`
+  builds the iOS app and sends it to TestFlight.
+
 ## Where things are
 
 ```
 app/                    Screens (Expo Router: file name = route)
-  (onboarding)/         welcome → profile → scan → find-friends
+  (auth)/               welcome, email code sign-in
+  (onboarding)/         profile → scan → find-friends
   (tabs)/               Near misses feed, Friends, You (settings)
   activity.tsx          Bell → activity list
   reveal.tsx            "Maya just joined" reveal
@@ -30,14 +40,16 @@ app/                    Screens (Expo Router: file name = route)
 src/
   theme.ts              Colors, fonts, radii (the design system)
   components/           Buttons, cards, chips, avatars, maps, illustrations
-  data/mock.ts          Sample data (replaced by Supabase in step 2)
-  state/store.ts        App state (zustand)
+  lib/supabase.ts       Supabase client
+  lib/auth.tsx          Sign-in, profile, settings (saved to Supabase)
+  data/mock.ts          Sample near misses and friends (replaced in steps 3–7)
+  state/store.ts        Local state for the sample data (zustand)
 ```
 
 ## Build plan
 
 1. ✅ All screens, clickable, on sample data
-2. Auth + profiles + Supabase schema, automatic deploys
+2. ✅ Auth + profiles + Supabase schema, automatic updates
 3. Photo scan (real `expo-media-library`) → moments → upload
 4. Contacts matching, invites, share sheet
 5. Matching function, feed, near miss page, reveal
@@ -46,4 +58,4 @@ src/
 8. Background location (development build), delay, hidden places
 9. Share card export, polish, App Store checklist
 
-Everything is currently sample data: there's no real sign-in or matching yet.
+Sign-in, profiles and settings are real. Near misses, friends and photos are still sample data.

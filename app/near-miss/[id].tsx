@@ -68,7 +68,7 @@ export default function NearMissScreen() {
             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
               <Chip label={`${nm.distance}m apart`} tone="outline" />
               {before && <Chip label={gap > 0 ? `${gap} year${gap > 1 ? 's' : ''} before you met` : 'Before you met'} tone="coral" />}
-              {nm.viaFriendId && <Chip label={`Friend of ${people[nm.viaFriendId].name}`} tone="green" />}
+              {!!nm.viaFriendId && <Chip label={`Friend of ${people[nm.viaFriendId].name}`} tone="green" />}
             </View>
           </View>
 

@@ -1,9 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
-import { Redirect, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { User, Users } from 'lucide-react-native';
 import { OverlapIcon } from '@/components/art';
-import { useStore } from '@/state/store';
 import { colors, fonts } from '@/theme';
 
 const TABS: Record<string, { label: string; icon: (c: string) => React.ReactNode }> = {
@@ -44,8 +43,6 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabsLayout() {
-  const onboarded = useStore((s) => s.onboarded);
-  if (!onboarded) return <Redirect href="/welcome" />;
   return (
     <Tabs tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}>
       <Tabs.Screen name="index" />

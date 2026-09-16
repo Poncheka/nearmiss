@@ -6,7 +6,8 @@ import { Body, Card, Chip, ChipTone, Display, IconButton, Pill, Screen, SectionL
 import { AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PhotoArt } from '@/components/art';
 import { activity, lockedMisses, nearMisses, NearMiss, people, theirPhotoColors } from '@/data/mock';
-import { delayLabel, isBeforeMet, useStore } from '@/state/store';
+import { isBeforeMet, useStore } from '@/state/store';
+import { useAuth } from '@/lib/auth';
 import { colors, fonts, radius } from '@/theme';
 
 type Tab = 'recent' | 'before' | 'all' | 'locked';
@@ -46,7 +47,8 @@ export default function Feed() {
   const shared = useStore((s) => s.shared);
   const theyShared = useStore((s) => s.theyShared);
   const activityRead = useStore((s) => s.activityRead);
-  const delay = useStore((s) => s.delay);
+  const { settings } = useAuth();
+  const delayText = { 3: '3 days', 7: '1 week', 14: '2 weeks', 30: '1 month' }[settings.delay_days];
 
   const tagFor = (nm: NearMiss): { label: string; tone: ChipTone } | undefined => {
     if (nm.isNew && !seen[nm.id]) return { label: 'New', tone: 'violet' };
@@ -74,7 +76,7 @@ export default function Feed() {
     { id: 'locked', label: 'Locked', count: lockedMisses.length },
   ];
   const footnotes: Record<Tab, string> = {
-    recent: `Recent near misses show up ${delayLabel[delay]} after they happen.`,
+    recent: `Recent near misses show up ${delayText} after they happen.`,
     before: 'Before the first time we saw you two together.',
     all: 'Grouped by night. Near misses with new replies move to the top.',
     locked: 'These unlock when the other person joins.',

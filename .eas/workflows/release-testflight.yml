@@ -1,0 +1,24 @@
+name: Release to TestFlight
+
+# Runs when you push a version tag (git tag v0.1.0 && git push --tags)
+# or when started by hand from expo.dev → Workflows.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    name: Build iOS app
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Send to TestFlight
+    type: submit
+    needs: [build_ios]
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
