@@ -26,9 +26,6 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-      {/* Email sign-in links open here, signed in or not */}
-      <Stack.Screen name="auth-callback" />
-
       {/* Signed out: welcome + email sign-in */}
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />
@@ -47,6 +44,10 @@ function RootNavigator() {
         <Stack.Screen name="friend/[id]" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
       </Stack.Protected>
+
+      {/* Email sign-in links open here, signed in or not. Keep this last: when a screen is
+          unavailable, the router falls back to the first screen in this list. */}
+      <Stack.Screen name="auth-callback" />
     </Stack>
   );
 }
