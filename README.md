@@ -17,7 +17,7 @@ See every time you and your friends almost crossed paths, sometimes years before
 
 Press `w` in the terminal to open it in a browser instead.
 
-Sign in with Apple or an emailed code. While developing, "Look around with sample data" on the
+Sign in with Apple, Google or an emailed link. While developing, "Look around with sample data" on the
 welcome screen skips sign-in.
 
 ## When do I need a new build?
@@ -27,9 +27,17 @@ location, camera or sign-in), or a change to `plugins` / `ios` / `android` in `a
 Everything else (screens, logic, styling) reaches the installed app live from `npx expo start`,
 or through the automatic update on push.
 
-The current development build already includes everything planned for steps 3–8: photo library,
-background location, contacts, notifications, image picker, maps, clipboard, sharing, haptics,
+The development build includes every native module the MVP needs: photo library, one-time location
+(for marking home/work), contacts, notifications, image picker, maps, clipboard, sharing, haptics,
 share-card capture, Apple and Google sign-in.
+
+## MVP scope
+
+- Near misses come only from **photo history**. No background location, no "recent" near misses,
+  and photos from the last 30 days are never matched (enforced in the database).
+- **No public profiles.** A profile is visible only to friends and people you share a near miss with.
+  Friends are found through hashed contacts (`find_contacts_on_app`).
+- Email sign-in is a **magic link** that opens the app.
 
 ## Automatic updates (EAS Workflows)
 

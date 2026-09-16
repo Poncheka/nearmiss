@@ -6,27 +6,19 @@ import { Settings, useAuth } from '@/lib/auth';
 import { colors } from '@/theme';
 
 type Audience = Settings['audience'];
-type Delay = '3' | '7' | '14' | '30';
 type NotifKey = 'notify_photos' | 'notify_replies' | 'notify_joins' | 'notify_weekly_report' | 'notify_on_this_day';
 
 const audienceOptions: { id: Audience; label: string; sub: string }[] = [
   { id: 'friends', label: 'Friends only', sub: 'People you have added' },
   { id: 'fof', label: 'Friends + friends of friends', sub: 'They see where and when, never your path' },
-  { id: 'everyone', label: 'Everyone on Near Miss', sub: 'Strangers can match with you. Names stay hidden until you both say hi.' },
 ];
 
-const delayOptions: { id: Delay; label: string }[] = [
-  { id: '3', label: '3 days' },
-  { id: '7', label: '1 week' },
-  { id: '14', label: '2 weeks' },
-  { id: '30', label: '1 month' },
-];
 
 const notifOptions: { id: NotifKey; label: string; sub: string }[] = [
   { id: 'notify_photos', label: 'Photos shared with you', sub: 'Right away' },
   { id: 'notify_replies', label: 'Replies', sub: 'Bundled per near miss' },
   { id: 'notify_joins', label: 'Friends joining', sub: 'With your near misses together' },
-  { id: 'notify_weekly_report', label: 'Weekly report', sub: 'New near misses, every Sunday' },
+  { id: 'notify_weekly_report', label: 'Weekly report', sub: 'New near misses from friends who joined, every Sunday' },
   { id: 'notify_on_this_day', label: 'On this day', sub: 'Anniversaries of old near misses' },
 ];
 
@@ -54,7 +46,6 @@ function Label({ title, sub }: { title: string; sub?: string }) {
 
 export default function You() {
   const { profile, settings, updateSettings, signOut, demo } = useAuth();
-  const isPublic = settings.audience === 'everyone';
   const save = (patch: Partial<Settings>) => updateSettings(patch).catch(() => Alert.alert("Couldn't save", 'Check your connection and try again.'));
   const confirmSignOut = () => Alert.alert('Sign out?', '', [
     { text: 'Cancel', style: 'cancel' },
@@ -94,16 +85,8 @@ export default function You() {
             );
           })}
         </Group>
-        {isPublic && (
-          <View style={{ marginTop: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, backgroundColor: colors.violetTint }}>
-            <Body size={13} color={colors.violetInk}>Public never means live. Strangers only see a place and time, at least a week later, and never your path, home or work.</Body>
-          </View>
-        )}
-
-        <SectionLabel>Recent near misses show up after</SectionLabel>
-        <Segmented options={delayOptions} value={String(settings.delay_days) as Delay} onChange={(d) => save({ delay_days: Number(d) as Settings['delay_days'] })} disabled={isPublic ? ['3'] : []} />
         <Body size={13} color={colors.muted} style={{ paddingTop: 8, paddingHorizontal: 4 }}>
-          Only applies to new near misses from your location. Ones from your photo history show up right away, since they're already in the past.
+          Your profile is never public. Only friends and people you share a near miss with can see it.
         </Body>
 
         <SectionLabel>Notify me about</SectionLabel>
@@ -140,8 +123,7 @@ export default function You() {
             <TextLink label="Rescan" size={15} />
           </Row>
           <Row last>
-            <Label title="Background location" sub={settings.background_location ? 'On. Finding new near misses.' : 'Off. Photo history only.'} />
-            <Toggle value={settings.background_location} onChange={() => save({ background_location: !settings.background_location })} />
+            <Label title="Recent photos" sub="Photos from the last 30 days are never matched" />
           </Row>
         </Group>
 

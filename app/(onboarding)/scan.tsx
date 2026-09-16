@@ -103,13 +103,12 @@ export default function Scan() {
             <Display size={32}>2,941 photos with a time and place</Display>
             <Body size={17} color={colors.text2}>From 2013 to today. That's plenty to find near misses.</Body>
             <Card style={{ padding: 16, gap: 6 }}>
-              <Body size={17} weight="bold">Keep finding new ones?</Body>
-              <Body size={15} color={colors.text2}>Let Near Miss use your location in the background. Friends only see recent near misses after a delay you choose, and never at home or work.</Body>
+              <Body size={17} weight="bold">Next: find your friends</Body>
+              <Body size={15} color={colors.text2}>Near misses appear when friends join and scan their photos too. Photos from the last 30 days are never matched.</Body>
             </Card>
             <View style={{ flex: 1 }} />
             <View style={{ gap: 4 }}>
-              <Button label="Allow location" onPress={next} />
-              <Button label="Not now, photos only" variant="text" onPress={next} />
+              <Button label="Continue" onPress={next} />
             </View>
           </View>
         )}

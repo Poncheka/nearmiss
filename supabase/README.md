@@ -7,9 +7,9 @@ versions recorded in Supabase, so the Supabase CLI (`supabase db push`) sees the
 
 ## What's in the database
 
-- **profiles** (public to signed-in users) and **user_settings** (private). Both are created automatically on sign-up.
+- **profiles** (visible only to yourself, friends and near-miss matches) and **user_settings** (private). Both are created automatically on sign-up.
 - **location_points → moments → near_misses**: raw time + place, clustered moments, and matches between two people.
-  Near misses are read-only for the two people involved, and hidden until their delay has passed.
+  Photo history only. Near misses are read-only for the two people involved, and photos from the last 30 days are never matched.
 - **friendships** (including the shared "you met" date), **shared_photos**, **comments**, **read_state**,
   **activity**, **match_feedback**, **blocks**, **reports**, **hidden_zones**, **contact_hashes**.
 - Storage buckets: `avatars` (public) and `shared-photos` (private; only the two people in a near miss can see them).
@@ -28,5 +28,7 @@ versions recorded in Supabase, so the Supabase CLI (`supabase db push`) sees the
 
 Supabase's built-in email only delivers to members of this Supabase account and is heavily rate-limited.
 Before inviting testers, connect a custom SMTP provider (for example Resend, with our own domain) under
-Authentication → Emails → SMTP. Custom SMTP also unlocks template editing, so the email can include the
-6-digit code (`{{ .Token }}`), which the app already accepts.
+Authentication → Emails → SMTP. Custom SMTP also unlocks template editing (branding the sign-in email).
+
+While testing in Expo Go, set **Site URL** to the `exp://…/--/auth-callback` address Expo prints.
+In the installed app, set it to `nearmiss://auth-callback`.

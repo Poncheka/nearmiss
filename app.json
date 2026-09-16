@@ -60,13 +60,10 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Near Miss uses your location in the background to find new near misses. Friends only see them after your chosen delay, and never at home or work.",
-          "locationAlwaysPermission": "Near Miss uses your location in the background to find new near misses. Friends only see them after your chosen delay, and never at home or work.",
-          "locationWhenInUsePermission": "Near Miss uses your location to find new near misses with friends.",
-          "motionUsagePermission": false,
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
+          "locationWhenInUsePermission": "Near Miss uses your location once, only if you choose to mark home or work as a hidden place.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false
         }
       ],
       [

@@ -1,32 +1,28 @@
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
-import { Body, Button, Display, IconButton, Screen, TextLink } from '@/components/ui';
+import { ChevronLeft, MailCheck } from 'lucide-react-native';
+import { Body, Button, Display, IconButton, IconTile, Screen, TextLink } from '@/components/ui';
 import { errorMessage, useAuth } from '@/lib/auth';
 import { colors, fonts, radius } from '@/theme';
 
-const inputStyle = {
-  height: 56, borderRadius: radius.input, borderWidth: 1, borderColor: colors.inputBorder,
-  paddingHorizontal: 16, fontSize: 18, fontFamily: fonts.regular, backgroundColor: colors.white, color: colors.ink,
-} as const;
-
 export default function EmailSignIn() {
-  const { sendEmailCode, verifyEmailCode, linkError } = useAuth();
-  const [step, setStep] = useState<'email' | 'code'>('email');
+  const { sendEmailCode: sendLink, linkError } = useAuth();
+  const [step, setStep] = useState<'email' | 'sent'>('email');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [resent, setResent] = useState(false);
 
   const validEmail = /^\S+@\S+\.\S+$/.test(email.trim());
 
-  const send = async () => {
+  const send = async (again = false) => {
     if (!validEmail || busy) return;
     setBusy(true); setError('');
     try {
-      await sendEmailCode(email);
-      setStep('code');
+      await sendLink(email);
+      setStep('sent');
+      setResent(again);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -34,23 +30,14 @@ export default function EmailSignIn() {
     }
   };
 
-  const verify = async (value = code) => {
-    if (value.length < 6 || busy) return;
-    setBusy(true); setError('');
-    try {
-      await verifyEmailCode(email, value);
-      // The root navigator moves on automatically once signed in.
-    } catch (e) {
-      setError(errorMessage(e));
-      setBusy(false);
-    }
-  };
+  const openMail = () => Linking.openURL(Platform.OS === 'ios' ? 'message://' : 'mailto:').catch(() => {});
+  const shownError = error || linkError;
 
   return (
     <Screen edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 22 }}>
-          <IconButton label="Back" onPress={() => (step === 'code' ? (setStep('email'), setCode(''), setError('')) : router.back())}>
+          <IconButton label="Back" onPress={() => (step === 'sent' ? (setStep('email'), setError('')) : router.back())}>
             <ChevronLeft size={20} color={colors.ink} />
           </IconButton>
 
@@ -61,7 +48,7 @@ export default function EmailSignIn() {
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                onSubmitEditing={send}
+                onSubmitEditing={() => send()}
                 autoFocus
                 autoCapitalize="none"
                 autoComplete="email"
@@ -69,40 +56,34 @@ export default function EmailSignIn() {
                 textContentType="emailAddress"
                 placeholder="you@example.com"
                 placeholderTextColor={colors.faint}
-                style={inputStyle}
+                style={{ height: 56, borderRadius: radius.input, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 16, fontSize: 18, fontFamily: fonts.regular, backgroundColor: colors.white, color: colors.ink }}
               />
             </View>
           ) : (
             <View style={{ gap: 14 }}>
+              <IconTile size={64} radiusSize={20}><MailCheck size={30} color={colors.violet} strokeWidth={1.8} /></IconTile>
               <Display size={32}>Check your email</Display>
-              <Body size={16} color={colors.text2}>Open the email we sent to {email.trim()} on this phone and tap the sign-in link. If your email has a 6-digit code instead, enter it here.</Body>
-              <TextInput
-                value={code}
-                onChangeText={(t) => {
-                  const digits = t.replace(/\D/g, '').slice(0, 6);
-                  setCode(digits);
-                  if (digits.length === 6) verify(digits);
-                }}
-                autoFocus
-                keyboardType="number-pad"
-                textContentType="oneTimeCode"
-                autoComplete="one-time-code"
-                placeholder="123456"
-                placeholderTextColor={colors.faint}
-                style={[inputStyle, { fontSize: 28, letterSpacing: 8, textAlign: 'center', fontFamily: fonts.semibold }]}
-              />
-              <TextLink label="Send another email" size={15} onPress={send} style={{ alignSelf: 'center' }} />
+              <Body size={16} color={colors.text2}>
+                We sent a sign-in link to <Body size={16} weight="semibold">{email.trim()}</Body>. Open it on this phone and tap the link. It brings you right back here, signed in.
+              </Body>
+              <Body size={14} color={colors.muted}>{resent ? 'Sent again. ' : ''}The link works once and expires after an hour. Check spam if you don't see it.</Body>
             </View>
           )}
 
-          {error || linkError ? <Body size={14} color={colors.danger}>{error || linkError}</Body> : null}
+          {shownError ? <Body size={14} color={colors.danger}>{shownError}</Body> : null}
           <View style={{ flex: 1 }} />
           {busy ? (
             <View style={{ height: 54, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.violet} /></View>
           ) : step === 'email' ? (
-            <Button label="Email me a link" onPress={send} variant={validEmail ? 'violet' : 'sand'} />
+            <Button label="Email me a link" onPress={() => send()} variant={validEmail ? 'violet' : 'sand'} />
           ) : (
-            <Button label="Continue" onPress={() => verify()} variant={code.length === 6 ? 'violet' : 'sand'} />
+            <View style={{ gap: 4 }}>
+              <Button label="Open Mail" onPress={openMail} />
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20 }}>
+                <TextLink label="Send again" size={15} onPress={() => send(true)} />
+                <TextLink label="Use a different email" size={15} onPress={() => { setStep('email'); setError(''); }} />
+              </View>
+            </View>
           )}
         </View>
       </KeyboardAvoidingView>

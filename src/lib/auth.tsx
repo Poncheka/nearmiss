@@ -15,9 +15,7 @@ export type Profile = {
 };
 
 export type Settings = {
-  audience: 'friends' | 'fof' | 'everyone';
-  delay_days: 3 | 7 | 14 | 30;
-  background_location: boolean;
+  audience: 'friends' | 'fof';
   notify_photos: boolean;
   notify_replies: boolean;
   notify_joins: boolean;
@@ -28,8 +26,6 @@ export type Settings = {
 
 const defaultSettings: Settings = {
   audience: 'fof',
-  delay_days: 3,
-  background_location: false,
   notify_photos: true,
   notify_replies: true,
   notify_joins: true,
@@ -40,6 +36,8 @@ const defaultSettings: Settings = {
 
 type AuthState = {
   loading: boolean;
+  /** Signed in and profile/settings fetched (so we know whether onboarding is done). */
+  userLoaded: boolean;
   /** Signed in with a real account, or exploring in demo mode. */
   signedIn: boolean;
   demo: boolean;
@@ -49,7 +47,7 @@ type AuthState = {
   onboarded: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  /** Emails a sign-in link (and a 6-digit code once custom email templates are set up). */
+  /** Emails a one-time sign-in link. */
   sendEmailCode: (email: string) => Promise<void>;
   linkError: string;
   verifyEmailCode: (email: string, code: string) => Promise<void>;
@@ -93,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [linkError, setLinkError] = useState('');
+  const [userLoaded, setUserLoaded] = useState(false);
 
   const loadUser = useCallback(async (userId: string) => {
     const [p, s] = await Promise.all([
@@ -101,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     if (p.data) setProfile(p.data);
     if (s.data) setSettings({ ...defaultSettings, ...(s.data as Partial<Settings>) });
+    setUserLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       if (next) loadUser(next.user.id);
-      else { setProfile(null); setSettings(defaultSettings); }
+      else { setProfile(null); setSettings(defaultSettings); setUserLoaded(false); }
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, [loadUser]);
@@ -228,12 +228,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [demo, session]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
-    // Public matching always waits at least a week.
     const next = { ...settings, ...patch };
-    if (next.audience === 'everyone' && next.delay_days < 7) next.delay_days = 7;
     setSettings(next);
     if (demo || !session) return;
-    const { error } = await supabase.from('user_settings').update({ ...patch, delay_days: next.delay_days }).eq('user_id', session.user.id);
+    const { error } = await supabase.from('user_settings').update(patch).eq('user_id', session.user.id);
     if (error) { setSettings(settings); throw new UserFacingError(error.message); }
   }, [demo, session, settings]);
 
@@ -243,6 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthState>(() => ({
     loading,
+    userLoaded: demo || userLoaded,
     signedIn: demo || !!session,
     demo,
     session,
@@ -259,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveProfile,
     updateSettings,
     finishOnboarding,
-  }), [loading, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
+  }), [loading, userLoaded, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

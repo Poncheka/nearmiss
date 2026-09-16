@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -16,13 +17,21 @@ import { colors } from '@/theme';
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { loading, signedIn, onboarded } = useAuth();
+  const { loading, signedIn, onboarded, userLoaded } = useAuth();
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();
   }, [loading]);
 
   if (loading) return null;
+  // Just signed in (Apple, Google or an email link): wait for the profile so we know where to go.
+  if (signedIn && !userLoaded) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <ActivityIndicator color={colors.violet} />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>

@@ -7,10 +7,9 @@ import { AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PhotoArt } from '@/components/art';
 import { activity, lockedMisses, nearMisses, NearMiss, people, theirPhotoColors } from '@/data/mock';
 import { isBeforeMet, useStore } from '@/state/store';
-import { useAuth } from '@/lib/auth';
 import { colors, fonts, radius } from '@/theme';
 
-type Tab = 'recent' | 'before' | 'all' | 'locked';
+type Tab = 'all' | 'before' | 'locked';
 
 const openNearMiss = (id: string) => router.push({ pathname: '/near-miss/[id]', params: { id } });
 
@@ -40,15 +39,13 @@ function NearMissCard({ nm, unread, tag }: { nm: NearMiss; unread: number; tag?:
 }
 
 export default function Feed() {
-  const [tab, setTab] = useState<Tab>('recent');
+  const [tab, setTab] = useState<Tab>('all');
   const met = useStore((s) => s.met);
   const unread = useStore((s) => s.unread);
   const seen = useStore((s) => s.seen);
   const shared = useStore((s) => s.shared);
   const theyShared = useStore((s) => s.theyShared);
   const activityRead = useStore((s) => s.activityRead);
-  const { settings } = useAuth();
-  const delayText = { 3: '3 days', 7: '1 week', 14: '2 weeks', 30: '1 month' }[settings.delay_days];
 
   const tagFor = (nm: NearMiss): { label: string; tone: ChipTone } | undefined => {
     if (nm.isNew && !seen[nm.id]) return { label: 'New', tone: 'violet' };
@@ -58,27 +55,25 @@ export default function Feed() {
   };
 
   const lists = useMemo(() => {
-    const recent = nearMisses.filter((n) => n.source === 'recent');
     const before = nearMisses.filter((n) => isBeforeMet(met, n)).sort((a, b) => a.year - b.year);
-    // Newest first, but anything with unread activity floats to the top.
-    const all = [...nearMisses].sort((a, b) => (unread[b.id] ? 1 : 0) - (unread[a.id] ? 1 : 0));
-    return { recent, before, all };
-  }, [met, unread]);
+    // Newest first, but anything unseen or with unread activity floats to the top.
+    const score = (n: NearMiss) => (unread[n.id] ? 2 : 0) + (n.isNew && !seen[n.id] ? 1 : 0);
+    const all = [...nearMisses].sort((a, b) => score(b) - score(a) || b.year - a.year);
+    return { before, all };
+  }, [met, unread, seen]);
 
   // "Needs you": a friend shared a photo and you haven't shared back.
   const needsYou = nearMisses.filter((n) => theyShared[n.id] && !shared[n.id]);
   const unreadActivity = activityRead ? 0 : activity.filter((a) => a.fresh).length;
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: 'recent', label: 'Recent', count: lists.recent.length },
-    { id: 'before', label: 'Before you met', count: lists.before.length },
     { id: 'all', label: 'All', count: lists.all.length },
+    { id: 'before', label: 'Before you met', count: lists.before.length },
     { id: 'locked', label: 'Locked', count: lockedMisses.length },
   ];
   const footnotes: Record<Tab, string> = {
-    recent: `Recent near misses show up ${delayText} after they happen.`,
+    all: 'From your photos, one per night. Photos from the last 30 days are never matched.',
     before: 'Before the first time we saw you two together.',
-    all: 'Grouped by night. Near misses with new replies move to the top.',
     locked: 'These unlock when the other person joins.',
   };
   const rows = tab === 'locked' ? [] : lists[tab];
