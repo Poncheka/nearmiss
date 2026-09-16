@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Body, Button, Display, Screen, TextLink } from '@/components/ui';
 import { WelcomeArt } from '@/components/art';
 import { errorMessage, useAuth } from '@/lib/auth';
@@ -13,7 +14,9 @@ export default function Welcome() {
   // (it sometimes isn't inside Expo Go) we show our own button and surface any error.
   const [nativeApple, setNativeApple] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const isIOS = Platform.OS === 'ios';
+  // Apple sign-in isn't included in Expo Go; it works in development and App Store builds.
+  const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  const isIOS = Platform.OS === 'ios' && !inExpoGo;
 
   useEffect(() => {
     if (!isIOS) return;
@@ -60,6 +63,9 @@ export default function Welcome() {
           {isIOS && nativeApple === false && <Button label="Continue with Apple" variant="ink" onPress={apple} />}
           <Button label="Continue with email" variant={isIOS ? 'white' : 'ink'} onPress={() => router.push('/email')} />
           {__DEV__ && <Button label="Look around with sample data" variant="text" onPress={startDemo} />}
+          {inExpoGo && Platform.OS === 'ios' && (
+            <Body size={12} color={colors.muted} style={{ textAlign: 'center' }}>Apple sign-in appears in the installed Near Miss app, not in Expo Go.</Body>
+          )}
           <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
             <Body size={13} color={colors.muted}>18+ only ·</Body>
             <TextLink label="Privacy" size={13} />
