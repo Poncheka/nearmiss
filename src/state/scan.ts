@@ -1,7 +1,8 @@
 // One photo scan at a time, shared by onboarding and the You tab.
 // The scan keeps going while you move between screens.
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { getScanStats, scanPhotos, ScanProgress, ScanResult, ScanStats } from '@/lib/photoScan';
+import { getPhotoAccess, getScanStats, scanPhotos, ScanProgress, ScanResult, ScanStats } from '@/lib/photoScan';
 
 type ScanState = {
   running: boolean;
@@ -13,7 +14,11 @@ type ScanState = {
   stop: () => void;
   refreshStats: () => Promise<void>;
   reset: () => void;
+  autoScan: () => Promise<void>;
 };
+
+const AUTO_KEY = 'nearmiss.autoscan.last';
+const AUTO_EVERY_MS = 12 * 60 * 60 * 1000;
 
 let signal = { cancelled: false };
 
@@ -45,6 +50,23 @@ export const useScan = create<ScanState>((set, get) => ({
   refreshStats: async () => {
     const stats = await getScanStats();
     if (stats) set({ stats });
+  },
+  // Quietly picks up photos that have aged past 30 days since the last scan.
+  // Runs at most every 12 hours, only for people who already scanned and still allow full access.
+  autoScan: async () => {
+    try {
+      if (get().running) return;
+      const last = Number((await AsyncStorage.getItem(AUTO_KEY)) ?? 0);
+      if (Date.now() - last < AUTO_EVERY_MS) return;
+      const access = await getPhotoAccess();
+      if (access !== 'granted' && access !== 'limited') return;
+      const stats = await getScanStats();
+      if (!stats || stats.points === 0) return;
+      await AsyncStorage.setItem(AUTO_KEY, String(Date.now()));
+      await get().start();
+    } catch (e) {
+      console.warn('Background photo check failed', e);
+    }
   },
   reset: () => {
     signal.cancelled = true;

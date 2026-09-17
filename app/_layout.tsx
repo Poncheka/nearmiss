@@ -45,11 +45,6 @@ function RootNavigator() {
         <Stack.Screen name="(onboarding)" />
       </Stack.Protected>
 
-      {/* Hidden places: reachable from the scan step and from the You tab */}
-      <Stack.Protected guard={signedIn}>
-        <Stack.Screen name="places" />
-      </Stack.Protected>
-
       {/* The app */}
       <Stack.Protected guard={signedIn && onboarded}>
         <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
@@ -57,6 +52,8 @@ function RootNavigator() {
         <Stack.Screen name="near-miss/[id]" />
         <Stack.Screen name="friend/[id]" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+        {/* Hidden places: opened from the You tab only */}
+        <Stack.Screen name="places" />
       </Stack.Protected>
 
       {/* Email sign-in links open here, signed in or not. Keep this last: when a screen is

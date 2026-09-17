@@ -1,8 +1,11 @@
-import { Pressable, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { AppState, Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { User, UserPlus } from 'lucide-react-native';
 import { OverlapIcon } from '@/components/art';
+import { useAuth } from '@/lib/auth';
+import { useScan } from '@/state/scan';
 import { colors, fonts } from '@/theme';
 
 const TABS: Record<string, { label: string; icon: (c: string) => React.ReactNode }> = {
@@ -43,6 +46,14 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabsLayout() {
+  const { demo } = useAuth();
+  // Pick up newly eligible photos when the app opens (at most every 12 hours).
+  useEffect(() => {
+    if (demo) return;
+    useScan.getState().autoScan();
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') useScan.getState().autoScan(); });
+    return () => sub.remove();
+  }, [demo]);
   return (
     <Tabs initialRouteName="index" backBehavior="initialRoute" tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}>
       {/* Near misses sits in the middle; the app still opens on it. */}

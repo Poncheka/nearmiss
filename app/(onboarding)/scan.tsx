@@ -112,10 +112,7 @@ export default function Scan() {
             <View style={{ gap: 10 }}>
               <Point icon={<Lock size={16} color={colors.violet} strokeWidth={2.2} />} label="Only the time and place are saved" />
               <Point icon={<ShieldCheck size={16} color={colors.violet} strokeWidth={2.2} />} label="Last 30 days are never matched" />
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Point icon={<House size={16} color={colors.violet} strokeWidth={2.2} />} label="Home and work are skipped" />
-                {!demo && <TextLink label="Set them" size={15} onPress={() => router.push('/places')} />}
-              </View>
+              <Point icon={<House size={16} color={colors.violet} strokeWidth={2.2} />} label="Hide places like home any time in settings" />
             </View>
             {scan.error ? <Body size={14} color={colors.danger}>{scan.error}</Body> : null}
             {access === 'unavailable' && !demo ? (
