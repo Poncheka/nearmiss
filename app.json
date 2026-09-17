@@ -46,7 +46,6 @@
           "iosUrlScheme": "com.googleusercontent.apps.75590594065-kba7va53qrukb9ij209qmhci9v6n2pjc"
         }
       ],
-      "expo-image",
       "expo-sharing",
       "expo-web-browser",
       [
@@ -85,7 +84,8 @@
           "cameraPermission": "Near Miss uses the camera if you take a new profile photo.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "./plugins/with-source-built-modules.js"
     ],
     "scheme": "nearmiss",
     "experiments": {

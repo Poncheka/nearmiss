@@ -43,3 +43,6 @@ yarn-error.*
 # secrets
 .env
 supabase/.temp/
+
+# Files the Claude app drops here
+Claude outputs/
