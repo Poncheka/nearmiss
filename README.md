@@ -82,7 +82,22 @@ src/
 9. Share card export, polish, App Store checklist
 
 Sign-in, profiles, profile photos, settings, hidden places and the photo scan are real.
-Near misses, friends and shared photos are still sample data.
+Contacts, friends, near-miss matching, the feed and comments are real too.
+Shared photos, the activity bell and push notifications are still sample data.
+
+### How matching works
+
+`private.match_pair` (Supabase) pairs two people's photos taken within 15 minutes and 100m, one
+near miss per pair per night, only for photos older than 30 days. It skips accounts that scanned the
+same photo library, photos that exist in both libraries (AirDrop), and nights when the two were
+clearly together. It runs when you scan, when two people become friends, and nightly at 10:00 UTC
+(pg_cron job `nightly-near-miss-matching`).
+
+### Website (nearmiss.io)
+
+`docs/` is the coming-soon page, served by GitHub Pages (Settings → Pages → main, /docs).
+Invite links (`nearmiss.io/i/<username>`) use `docs/404.html`. Waitlist sign-ups land in the
+`waitlist` table.
 
 ### Checking a scan landed in the database
 

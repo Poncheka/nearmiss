@@ -6,7 +6,7 @@ import { BookUser, Search, Share as ShareIcon } from 'lucide-react-native';
 import { Body, Button, Card, Display, Pill, ProgressDots, Screen, SectionLabel } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
-import { AppUser, FriendStatus, inviteLink, inviteMessage, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
+import { AppUser, chooseMoreContacts, FriendStatus, inviteLink, inviteMessage, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
 import { useAuth } from '@/lib/auth';
 import { colors, fonts, pastel, radius } from '@/theme';
 
@@ -140,6 +140,17 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
       )}
 
       {c.loading && sections.length === 0 && <ActivityIndicator color={colors.violet} style={{ paddingVertical: 24 }} />}
+      {!demo && access === 'limited' && !c.loading && (
+        <Card style={{ padding: 14, gap: 8 }}>
+          <Body size={15} color={colors.text2}>You shared {c.contacts.length ? `${c.contacts.length} contact${c.contacts.length === 1 ? '' : 's'}` : 'only some contacts'} with Near Miss.</Body>
+          <Button label="Choose more contacts" variant="tint" onPress={chooseMoreContacts} />
+        </Card>
+      )}
+      {!demo && access === 'granted' && !c.loading && !c.error && c.contacts.length === 0 && (
+        <Card style={{ padding: 14 }}>
+          <Body size={15} color={colors.text2}>We didn't find any contacts with a phone number or email on this phone.</Body>
+        </Card>
+      )}
       {c.error ? <Body size={14} color={colors.danger}>{c.error}</Body> : null}
     </View>
   );

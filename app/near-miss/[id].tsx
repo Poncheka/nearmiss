@@ -8,11 +8,18 @@ import { MiniMap, PhotoArt } from '@/components/art';
 import { me, myPhotoColors, nearMisses, people, theirPhotoColors } from '@/data/mock';
 import { getNearMiss, isBeforeMet, useStore, yearsBeforeMet } from '@/state/store';
 import { colors, fonts, radius } from '@/theme';
+import { useAuth } from '@/lib/auth';
+import { RealNearMissScreen } from '@/components/RealNearMissScreen';
 
 const FEEDBACK = ['We were together', 'Not interesting', 'Hide this place'];
 
-export default function NearMissScreen() {
+export default function NearMissRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { demo } = useAuth();
+  return demo ? <NearMissScreen id={id} /> : <RealNearMissScreen id={id} />;
+}
+
+function NearMissScreen({ id }: { id: string }) {
   const nm = getNearMiss(id) ?? nearMisses[0];
   const friend = people[nm.friendId];
   const { width } = useWindowDimensions();

@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useScan } from '@/state/scan';
 import { usePlaces } from '@/lib/places';
 import { useContacts } from '@/lib/contacts';
+import { useNearMisses } from '@/lib/nearMisses';
 
 export type Profile = {
   id: string;
@@ -216,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useScan.getState().reset();
     usePlaces.getState().reset();
     useContacts.getState().reset();
+    useNearMisses.getState().reset();
     await supabase.auth.signOut();
   }, [demo]);
 

@@ -3,6 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { getPhotoAccess, getScanStats, scanPhotos, ScanProgress, ScanResult, ScanStats } from '@/lib/photoScan';
+import { useNearMisses } from '@/lib/nearMisses';
 
 type ScanState = {
   running: boolean;
@@ -36,6 +37,8 @@ export const useScan = create<ScanState>((set, get) => ({
       const result = await scanPhotos({ signal, onProgress: (progress) => set({ progress }) });
       set({ result });
       await get().refreshStats();
+      // New photos can mean new near misses.
+      useNearMisses.getState().load({ rematch: true });
       return result;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

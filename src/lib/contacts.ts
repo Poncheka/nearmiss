@@ -6,6 +6,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { useNearMisses } from '@/lib/nearMisses';
 
 type ContactsModule = typeof import('expo-contacts');
 
@@ -23,8 +24,7 @@ export type AppUser = { id: string; username: string | null; name: string | null
 export type FriendStatus = 'friends' | 'requested' | 'incoming';
 export type ContactsAccess = 'granted' | 'limited' | 'denied' | 'undetermined' | 'unavailable';
 
-// Swap in the real domain once it's set up.
-export const INVITE_BASE_URL = process.env.EXPO_PUBLIC_INVITE_URL ?? 'https://[domain]';
+export const INVITE_BASE_URL = process.env.EXPO_PUBLIC_INVITE_URL ?? 'https://nearmiss.io';
 export const inviteLink = (username?: string | null) => `${INVITE_BASE_URL}/i/${username || ''}`.replace(/\/i\/$/, '');
 export const inviteMessage = (username?: string | null) =>
   `Hey! I just joined Near Miss. Let's find out where we might have crossed paths before we met: ${inviteLink(username)}`;
@@ -153,10 +153,19 @@ export const useContacts = create<ContactsState>((set, get) => ({
     const status = data as FriendStatus;
     set({ statuses: { ...get().statuses, [id]: status } });
     get().refreshFriends();
+    if (status === 'friends') useNearMisses.getState().load({ rematch: true });
     return status;
   },
   reset: () => set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [] }),
 }));
+
+/** iOS 18+ "limited" contacts: let the person pick more. */
+export async function chooseMoreContacts() {
+  const C = lib();
+  if (!C) return;
+  try { await C.Contact.presentAccessPicker(); } catch { /* not available */ }
+  await useContacts.getState().load();
+}
 
 /** Opens Messages with the invite ready to send (or Mail, or the share sheet). */
 export async function sendInvite(c: Pick<PhoneContact, 'phone' | 'email'> | null, username?: string | null) {
