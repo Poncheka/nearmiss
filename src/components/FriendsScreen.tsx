@@ -25,7 +25,7 @@ const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name
 type Row = { kind: 'user'; user: AppUser } | { kind: 'contact'; contact: PhoneContact };
 
 export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) {
-  const { finishOnboarding, profile, demo } = useAuth();
+  const { profile, demo } = useAuth();
   const c = useContacts();
   const [q, setQ] = useState('');
   const [copied, setCopied] = useState(false);
@@ -181,8 +181,8 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
         {onboarding && (
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
             <View style={{ width: 44 }} />
-            <ProgressDots total={3} active={3} />
-            <Pill label="Done" variant="ink" height={40} onPress={() => finishOnboarding().then(() => router.replace('/'))} />
+            <ProgressDots total={4} active={3} />
+            <Pill label="Next" variant="ink" height={40} onPress={() => router.push('/turn-on-location')} />
           </View>
         )}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>

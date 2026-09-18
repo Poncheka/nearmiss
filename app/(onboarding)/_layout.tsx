@@ -9,6 +9,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="scan" options={{ gestureEnabled: false }} />
       <Stack.Screen name="profile" />
       <Stack.Screen name="find-friends" />
+      <Stack.Screen name="turn-on-location" options={{ gestureEnabled: false }} />
     </Stack>
   );
 }

@@ -53,7 +53,7 @@ export default function Profile() {
         <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 24 }} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <IconButton label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/scan'))}><ChevronLeft size={20} color={colors.ink} /></IconButton>
-            <ProgressDots total={3} active={2} />
+            <ProgressDots total={4} active={2} />
             <View style={{ width: 44 }} />
           </View>
           <Display size={32}>Make your profile</Display>

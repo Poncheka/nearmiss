@@ -88,18 +88,59 @@ export const formatWhen = (iso: string) => {
   };
 };
 
-// Looks up a readable place name on the phone (Apple Maps), then saves it for both people.
+const midpoint = (n: RealNearMiss) => ({ lat: (n.my_lat + n.their_lat) / 2, lng: (n.my_lng + n.their_lng) / 2 });
+
+/**
+ * Asks the server for the actual venue — "Balthazar" rather than "SoHo, New York".
+ *
+ * The Foursquare key lives in an Edge Function secret, so this is a round trip rather than a
+ * call from the phone. Returns what it could name; anything it couldn't falls through to
+ * Apple below. If the key isn't set yet, or the function is having a bad day, it returns
+ * nothing and the app behaves exactly as it did before.
+ */
+async function nameFromVenues(items: RealNearMiss[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!items.length) return out;
+  try {
+    const points = items.map((n) => ({ id: n.id, ...midpoint(n) }));
+    const { data, error } = await supabase.functions.invoke('place-name', { body: { points } });
+    if (error) return out;
+    for (const p of (data?.places ?? []) as { id: string; name: string }[]) {
+      if (p?.id && p?.name) out.set(p.id, p.name);
+    }
+  } catch {
+    // Offline, or the function isn't reachable. Apple's names are a fine second best.
+  }
+  return out;
+}
+
+// Names the places a near miss happened, then saves each one for both people.
 const naming = new Set<string>();
 async function namePlaces(items: RealNearMiss[], update: (id: string, name: string) => void) {
   if (Platform.OS === 'web') return;
   let Location: typeof import('expo-location');
   try { Location = require('expo-location'); } catch { return; }
   const todo = items.filter((n) => !n.place_name && !naming.has(n.id)).slice(0, 15);
-  for (const n of todo) {
+  if (!todo.length) return;
+
+  // Venues first, in one request for the whole batch.
+  todo.forEach((n) => naming.add(n.id));
+  let venues = new Map<string, string>();
+  try {
+    venues = await nameFromVenues(todo);
+    for (const [id, name] of venues) {
+      update(id, name);
+      await supabase.rpc('set_near_miss_place', { nm_id: id, name });
+    }
+  } finally {
+    todo.forEach((n) => naming.delete(n.id));
+  }
+
+  // Whatever Foursquare didn't know: the neighbourhood, from the phone.
+  for (const n of todo.filter((x) => !venues.has(x.id))) {
     naming.add(n.id);
     try {
-      const lat = (n.my_lat + n.their_lat) / 2;
-      const lng = (n.my_lng + n.their_lng) / 2;
+      const { lat, lng } = midpoint(n);
       const [p] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (!p) continue;
       const street = [p.streetNumber, p.street].filter(Boolean).join(' ');

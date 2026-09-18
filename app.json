@@ -2,7 +2,7 @@
   "expo": {
     "name": "Near Miss",
     "slug": "nearmiss",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -171,7 +171,8 @@
           "microphonePermission": false
         }
       ],
-      "./plugins/with-source-built-modules.js"
+      "./plugins/with-source-built-modules.js",
+      "expo-video"
     ],
     "scheme": "nearmiss",
     "experiments": {

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUp, ChevronLeft, ImagePlus, Maximize2, Play } from 'lucide-react-native';
+import { ArrowUp, ChevronLeft, ImagePlus, Maximize2 } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
+import { SharedVideo } from '@/components/SharedVideo';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { addComment, formatWhen, giveFeedback, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
@@ -195,20 +196,16 @@ export function RealNearMissScreen({ id }: { id: string }) {
                   ) : (
                     <Pressable
                       onLongPress={() => entry.photo.mine && unshare(entry.photo)}
-                      onPress={() => entry.photo.isVideo && entry.photo.url && Linking.openURL(entry.photo.url)}
                       style={{ maxWidth: '78%', borderRadius: 18, overflow: 'hidden', backgroundColor: colors.sand, borderWidth: 1, borderColor: colors.cardBorder }}
                     >
-                      {entry.photo.url ? (
-                        <Image source={{ uri: entry.photo.url }} style={{ width: 220, height: 220 }} resizeMode="cover" />
-                      ) : (
+                      {!entry.photo.url ? (
                         <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.violet} /></View>
-                      )}
-                      {entry.photo.isVideo && (
-                        <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
-                          <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
-                            <Play size={24} color={colors.white} fill={colors.white} />
-                          </View>
-                        </View>
+                      ) : entry.photo.isVideo ? (
+                        // Plays in place. Long-pressing the tile to unshare still works: the play
+                        // overlay only covers the video until it starts.
+                        <SharedVideo uri={entry.photo.url} size={220} />
+                      ) : (
+                        <Image source={{ uri: entry.photo.url }} style={{ width: 220, height: 220 }} resizeMode="cover" />
                       )}
                       <Body size={11} color={colors.faint} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
                         {entry.photo.mine ? `You · ${stamp}` : `${name} · ${stamp}`}
