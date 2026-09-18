@@ -55,6 +55,7 @@ function RootNavigator() {
         <Stack.Screen name="friend/[id]" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         {/* Opened from the You tab only */}
+        <Stack.Screen name="settings" />
         <Stack.Screen name="places" />
         <Stack.Screen name="location" />
         <Stack.Screen name="delete-account" />

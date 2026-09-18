@@ -1,288 +1,143 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+// Your profile: who you are, and who you're connected to. Everything you configure rather
+// than look at now lives behind the gear, in app/settings.tsx.
+import { useCallback, useMemo } from 'react';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import * as Location from 'expo-location';
-import { ChevronRight } from 'lucide-react-native';
-import { Body, Card, Display, Divider, Segmented, Screen, SectionLabel, TextLink, Toggle } from '@/components/ui';
+import { ChevronRight, Settings as SettingsIcon, UserPlus } from 'lucide-react-native';
+import { Body, Card, Display, Screen, SectionLabel } from '@/components/ui';
+import { Avatar } from '@/components/avatar';
 import { AvatarPicker } from '@/components/AvatarPicker';
-import { Settings, useAuth } from '@/lib/auth';
-import { Access, choosePhotos, clearScanData, getPhotoAccess, photoScanAvailable, requestPhotoAccess } from '@/lib/photoScan';
-import { usePlaces } from '@/lib/places';
-import { useScan } from '@/state/scan';
-import { colors } from '@/theme';
+import { useAuth } from '@/lib/auth';
+import { AppUser, useContacts } from '@/lib/contacts';
+import { useNearMisses } from '@/lib/nearMisses';
+import { colors, pastel, radius } from '@/theme';
 
-type Audience = Settings['audience'];
-type NotifKey = 'notify_photos' | 'notify_replies' | 'notify_joins' | 'notify_weekly_report' | 'notify_on_this_day';
+const PASTELS = [pastel.lilac, pastel.peach, pastel.sage, pastel.butter, pastel.sky];
+const colorFor = (key: string) => PASTELS[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % PASTELS.length];
 
-const audienceOptions: { id: Audience; label: string; sub: string }[] = [
-  { id: 'friends', label: 'Friends only', sub: 'People you have added' },
-  { id: 'fof', label: 'Friends + friends of friends', sub: 'They see where and when, never your path' },
-];
+const firstName = (u: AppUser) => u.name?.split(' ')[0] || (u.username ? `@${u.username}` : 'Friend');
 
-
-const notifOptions: { id: NotifKey; label: string; sub: string }[] = [
-  { id: 'notify_photos', label: 'Photos shared with you', sub: 'Right away' },
-  { id: 'notify_replies', label: 'Replies', sub: 'Bundled per near miss' },
-  { id: 'notify_joins', label: 'Friends joining', sub: 'With your near misses together' },
-  { id: 'notify_weekly_report', label: 'Weekly report', sub: 'New near misses from friends who joined, every Sunday' },
-  { id: 'notify_on_this_day', label: 'On this day', sub: 'Anniversaries of old near misses' },
-];
-
-function Group({ children }: { children: React.ReactNode }) {
-  return <Card style={{ paddingHorizontal: 16, paddingVertical: 2 }}>{children}</Card>;
-}
-
-function Row({ children, last, minHeight = 52 }: { children: React.ReactNode; last?: boolean; minHeight?: number }) {
+function Stat({ n, label }: { n: number; label: string }) {
   return (
-    <>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight, gap: 12, paddingVertical: 6 }}>{children}</View>
-      {!last && <Divider />}
-    </>
-  );
-}
-
-function Label({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <View style={{ flex: 1 }}>
-      <Body size={16} weight="semibold">{title}</Body>
-      {sub ? <Body size={13} color={colors.muted}>{sub}</Body> : null}
+    <View style={{ alignItems: 'center', minWidth: 76 }}>
+      <Display size={22}>{n.toLocaleString('en-US')}</Display>
+      <Body size={13} color={colors.muted}>{label}</Body>
     </View>
   );
 }
 
-const fmt = (n: number) => n.toLocaleString('en-US');
-const monthYear = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '');
-const fmtRadius = (m: number) => (m >= 1000 ? `${m / 1000}km` : `${m}m`);
-
-function PhotoData({ demo }: { demo: boolean }) {
-  const scan = useScan();
-  const [access, setAccess] = useState<Access | null>(null);
-
-  useFocusEffect(useCallback(() => {
-    if (demo) return;
-    getPhotoAccess().then(setAccess).catch(() => setAccess('unavailable'));
-    useScan.getState().refreshStats();
-  }, [demo]));
-
-  const rescan = async () => {
-    if (demo) return Alert.alert('Sample data', 'Sign in to scan your own photos.');
-    if (scan.running) return scan.stop();
-    let a = access;
-    if (a !== 'granted' && a !== 'limited') a = await requestPhotoAccess();
-    setAccess(a);
-    if (a === 'denied' || a === 'undetermined') {
-      return Alert.alert('Near Miss can\'t see your photos', 'Open Settings, tap Photos, and choose Full Access.', [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => Linking.openSettings() },
-      ]);
-    }
-    const r = await scan.start();
-    if (r) {
-      Alert.alert('Scan finished', `${fmt(r.saved)} new photo places saved. ${fmt(r.moments)} moments in total.`);
-    } else if (useScan.getState().error) {
-      Alert.alert("Couldn't finish the scan", useScan.getState().error ?? '');
-    }
-  };
-
-  const confirmClear = () => Alert.alert('Delete scanned data?', 'This removes every photo time and place we saved. Your photos stay on your phone. You can scan again any time.', [
-    { text: 'Cancel', style: 'cancel' },
-    {
-      text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await clearScanData(); await useScan.getState().refreshStats(); } catch (e) { Alert.alert("Couldn't delete", e instanceof Error ? e.message : String(e)); }
-      },
-    },
-  ]);
-
-  const s = scan.stats;
-  const p = scan.progress;
-  const sub = demo
-    ? '2,941 with a time and place'
-    : scan.running
-      ? p?.total ? `Scanning… ${fmt(Math.min(p.scanned, p.total))} of ${fmt(p.total)}` : 'Getting ready…'
-      : s
-        ? s.points > 0
-          ? `${fmt(s.points)} with a time and place · ${fmt(s.moments)} moments${s.oldest ? ` · since ${monthYear(s.oldest)}` : ''}`
-          : 'Nothing saved yet'
-        : 'Loading…';
-
+function FriendTile({ user, misses }: { user: AppUser; misses: number }) {
+  const name = firstName(user);
   return (
-    <Group>
-      <Row minHeight={60}>
-        <Label title="Photos scanned" sub={sub} />
-        {scan.running ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <ActivityIndicator color={colors.violet} />
-            <TextLink label="Stop" size={15} onPress={scan.stop} />
-          </View>
-        ) : photoScanAvailable || demo ? <TextLink label={demo || s?.points ? 'Rescan' : 'Scan'} size={15} onPress={rescan} /> : null}
-      </Row>
-      {!demo && access === 'limited' && (
-        <Row minHeight={56}>
-          <Label title="Some photos only" sub="You gave access to selected photos" />
-          <TextLink label="Choose more" size={15} onPress={choosePhotos} />
-        </Row>
-      )}
-      {!demo && access === 'denied' && (
-        <Row minHeight={56}>
-          <Label title="Photo access is off" sub="Turn on Full Access to scan" />
-          <TextLink label="Settings" size={15} onPress={() => Linking.openSettings()} />
-        </Row>
-      )}
-      {!demo && s && s.lastSaved ? (
-        <Row>
-          <Label title="Last saved" sub={new Date(s.lastSaved).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} />
-          <TextLink label="Delete" size={15} color={colors.danger} onPress={confirmClear} />
-        </Row>
-      ) : null}
-      <Row last>
-        <Label title="Recent photos" sub="Photos from the last 30 days are never matched" />
-      </Row>
-    </Group>
-  );
-}
-
-function HiddenPlaces({ demo }: { demo: boolean }) {
-  const { places, loaded, load } = usePlaces();
-  useEffect(() => { if (!demo && !loaded) load().catch(() => {}); }, [demo, loaded, load]);
-  const has = (l: string) => places.some((p) => p.label.toLowerCase() === l.toLowerCase());
-  const missing = ['Home', 'Work'].filter((l) => !has(l));
-  return (
-    <Group>
-      {places.map((p) => (
-        <Pressable key={p.id} onPress={() => router.push('/places')}>
-          <Row>
-            <Label title={p.label} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Body size={14} color={colors.muted}>{fmtRadius(p.radius_m)} around</Body>
-              <ChevronRight size={16} color={colors.faint} />
-            </View>
-          </Row>
-        </Pressable>
-      ))}
-      {missing.map((l) => (
-        <Pressable key={l} onPress={() => router.push({ pathname: '/places', params: { add: l } })}>
-          <Row>
-            <Label title={l} sub="Not set" />
-            <TextLink label="Set" size={15} onPress={() => router.push({ pathname: '/places', params: { add: l } })} />
-          </Row>
-        </Pressable>
-      ))}
-      <Row last><TextLink label="Add a place" onPress={() => router.push({ pathname: '/places', params: { add: '' } })} /></Row>
-    </Group>
-  );
-}
-
-function LocationRow() {
-  const [state, setState] = useState<string | null>(null);
-
-  useFocusEffect(useCallback(() => {
-    if (Platform.OS === 'web') { setState('Not available here'); return; }
-    Location.getForegroundPermissionsAsync()
-      .then((p) => setState(p.granted ? 'On while you use the app' : p.status === 'undetermined' ? 'Not asked yet' : 'Off'))
-      .catch(() => setState('Off'));
-  }, []));
-
-  return (
-    <Pressable onPress={() => router.push('/location')}>
-      <Group>
-        <Row last minHeight={56}>
-          <Label title="Location" sub={state ?? 'Checking…'} />
-          <ChevronRight size={16} color={colors.faint} />
-        </Row>
-      </Group>
+    <Pressable
+      onPress={() => router.push({ pathname: '/friend/[id]', params: { id: user.id } })}
+      style={{ width: 92, alignItems: 'center', gap: 6 }}
+    >
+      {user.avatar_url
+        ? <Image source={{ uri: user.avatar_url }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+        : <Avatar initial={name.replace('@', '').charAt(0).toUpperCase()} color={colorFor(user.id)} size={64} />}
+      <Body size={14} weight="semibold" numberOfLines={1} style={{ textAlign: 'center' }}>{name}</Body>
+      <Body size={12} color={colors.muted} numberOfLines={1}>
+        {misses > 0 ? `${misses} near ${misses === 1 ? 'miss' : 'misses'}` : 'No near misses'}
+      </Body>
     </Pressable>
   );
 }
 
-// Until there's a self-serve export, this is the honest version of the promise in the privacy policy.
-const requestExport = () => Alert.alert(
-  'Download my data',
-  'Email hello@nearmiss.io from the address on your account and we will send you everything we have stored, usually within a few days.',
-  [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Write the email', onPress: () => Linking.openURL('mailto:hello@nearmiss.io?subject=Data%20request') },
-  ],
-);
-
 export default function You() {
-  const { profile, settings, updateSettings, signOut, demo } = useAuth();
-  const save = (patch: Partial<Settings>) => updateSettings(patch).catch(() => Alert.alert("Couldn't save", 'Check your connection and try again.'));
-  const confirmSignOut = () => Alert.alert('Sign out?', '', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Sign out', style: 'destructive', onPress: () => { signOut(); } },
-  ]);
+  const { profile, demo } = useAuth();
+  const friendsAll = useContacts((s) => s.friends);
+  const statuses = useContacts((s) => s.statuses);
+  const items = useNearMisses((s) => s.items);
+
+  useFocusEffect(useCallback(() => {
+    if (demo) return;
+    useContacts.getState().refreshFriends();
+    useNearMisses.getState().load();
+  }, [demo]));
+
+  // Only people who actually accepted; requests still waiting belong on the Invite tab.
+  const friends = useMemo(
+    () => friendsAll.filter((f) => statuses[f.id] === 'friends'),
+    [friendsAll, statuses],
+  );
+
+  const missesPerFriend = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const n of items) m[n.other_id] = (m[n.other_id] ?? 0) + 1;
+    return m;
+  }, [items]);
 
   return (
     <Screen>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Display size={32}>You</Display>
+        <Pressable
+          accessibilityLabel="Settings"
+          onPress={() => router.push('/settings')}
+          style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.cardBorder }}
+        >
+          <SettingsIcon size={20} color={colors.ink} strokeWidth={2} />
+        </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 32 }}>
-        <Card style={{ padding: 16, flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <AvatarPicker size={64} showLink={false} />
-          <View style={{ flex: 1 }}>
-            <Body size={19} weight="bold">{profile?.name || `@${profile?.username ?? ''}`}</Body>
-            <Body size={14} color={colors.muted}>@{profile?.username}{profile?.bio ? ` · ${profile.bio}` : ''}</Body>
-            <Body size={14} style={{ paddingTop: 4 }}>12 friends · 7 near misses</Body>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 32, gap: 16 }}>
+        <Card style={{ padding: 20, alignItems: 'center', gap: 10 }}>
+          <AvatarPicker size={88} showLink={false} />
+          <View style={{ alignItems: 'center', gap: 2 }}>
+            <Display size={26}>{profile?.name || `@${profile?.username ?? ''}`}</Display>
+            <Body size={15} color={colors.muted}>@{profile?.username}</Body>
+            {profile?.bio ? <Body size={15} color={colors.text2} style={{ textAlign: 'center', paddingTop: 4 }}>{profile.bio}</Body> : null}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 24, paddingTop: 8 }}>
+            <Stat n={friends.length} label={friends.length === 1 ? 'friend' : 'friends'} />
+            <Stat n={items.length} label={items.length === 1 ? 'near miss' : 'near misses'} />
           </View>
         </Card>
 
-        <SectionLabel>Who can find near misses with you</SectionLabel>
-        <Group>
-          {audienceOptions.map((o, i) => {
-            const on = settings.audience === o.id;
-            return (
-              <Pressable key={o.id} onPress={() => save({ audience: o.id })} accessibilityRole="radio" accessibilityState={{ checked: on }}>
-                <Row last={i === audienceOptions.length - 1} minHeight={60}>
-                  <Label title={o.label} sub={o.sub} />
-                  <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: on ? colors.violet : colors.toggleOff, alignItems: 'center', justifyContent: 'center' }}>
-                    {on && <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.violet }} />}
-                  </View>
-                </Row>
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SectionLabel>Friends</SectionLabel>
+            {friends.length > 0 && (
+              <Pressable onPress={() => router.navigate('/invite')} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+                <Body size={15} weight="semibold" color={colors.violet}>Add</Body>
               </Pressable>
-            );
-          })}
-        </Group>
-        <Body size={13} color={colors.muted} style={{ paddingTop: 8, paddingHorizontal: 4 }}>
-          Your profile is never public. Only friends and people you share a near miss with can see it.
-        </Body>
+            )}
+          </View>
 
-        <SectionLabel>Notify me about</SectionLabel>
-        <Group>
-          {notifOptions.map((n, i) => (
-            <Row key={n.id} last={i === notifOptions.length - 1} minHeight={60}>
-              <Label title={n.label} sub={n.sub} />
-              <Toggle value={settings[n.id]} onChange={() => save({ [n.id]: !settings[n.id] })} />
-            </Row>
-          ))}
-        </Group>
-        <Body size={13} color={colors.muted} style={{ paddingTop: 8, paddingHorizontal: 4 }}>
-          Replies on the same near miss are bundled into one notification, and we send a few a day at most.
-        </Body>
+          {friends.length === 0 ? (
+            <Pressable onPress={() => router.navigate('/invite')}>
+              <Card style={{ padding: 18, alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.violetTint, alignItems: 'center', justifyContent: 'center' }}>
+                  <UserPlus size={22} color={colors.violet} strokeWidth={2} />
+                </View>
+                <Body size={16} weight="bold">No friends yet</Body>
+                <Body size={14} color={colors.muted} style={{ textAlign: 'center' }}>
+                  Near misses only exist between two people who have added each other.
+                </Body>
+                <View style={{ marginTop: 4, minHeight: 40, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: colors.violet, justifyContent: 'center' }}>
+                  <Body size={15} weight="bold" color={colors.white}>Find friends</Body>
+                </View>
+              </Card>
+            </Pressable>
+          ) : (
+            <Card style={{ paddingVertical: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+                {friends.map((f) => <FriendTile key={f.id} user={f} misses={missesPerFriend[f.id] ?? 0} />)}
+              </ScrollView>
+            </Card>
+          )}
+        </View>
 
-        <SectionLabel>Hidden places</SectionLabel>
-        <HiddenPlaces demo={demo} />
-        <Body size={13} color={colors.muted} style={{ paddingTop: 8, paddingHorizontal: 4 }}>
-          Photos taken inside these are never saved or matched.
-        </Body>
-
-        <SectionLabel>Location</SectionLabel>
-        <LocationRow />
-
-        <SectionLabel>Your data</SectionLabel>
-        <PhotoData demo={demo} />
-
-        <View style={{ height: 20 }} />
-        <Group>
-          <Row>
-            <TextLink label="Download my data" color={colors.ink} onPress={requestExport} />
-            <ChevronRight size={16} color={colors.faint} />
-          </Row>
-          <Row><TextLink label="Privacy policy" color={colors.ink} onPress={() => Linking.openURL('https://nearmiss.io/privacy')} /></Row>
-          <Row><TextLink label={demo ? 'Leave sample data' : 'Sign out'} color={colors.ink} onPress={confirmSignOut} /></Row>
-          <Row last><TextLink label="Delete my account" color={colors.danger} onPress={() => router.push('/delete-account')} /></Row>
-        </Group>
+        <Pressable onPress={() => router.push('/settings')}>
+          <Card style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Body size={16} weight="semibold">Settings</Body>
+              <Body size={14} color={colors.muted}>Privacy, hidden places, photo data, notifications</Body>
+            </View>
+            <ChevronRight size={18} color={colors.faint} />
+          </Card>
+        </Pressable>
       </ScrollView>
     </Screen>
   );

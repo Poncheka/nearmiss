@@ -83,6 +83,10 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     if (!demo) for (const f of c.friends) if (!users.has(f.id)) users.set(f.id, f);
     const match = (s: string) => !query || s.toLowerCase().includes(query);
     const userRows = [...users.values()]
+      // People you've already added live on your profile now. This tab is for people you
+      // haven't connected with yet — keeping friends here just made it a list you scroll past.
+      // A username search still surfaces them, so you can always find someone deliberately.
+      .filter((u) => (query ? true : statuses[u.id] !== 'friends'))
       .filter((u) => match(`${u.name ?? ''} ${u.username ?? ''}`))
       .sort((a, b) => rank(statuses[a.id]) - rank(statuses[b.id]));
     const contactRows = (demo ? demoContacts : c.contacts).filter((p) => match(`${p.name} ${p.phone ?? ''} ${p.email ?? ''}`));

@@ -8,10 +8,18 @@ import { PhotoArt } from '@/components/art';
 import { myPhotoColors, nearMisses, people, theirPhotoColors } from '@/data/mock';
 import { isBeforeMet, metYear, useStore } from '@/state/store';
 import { colors, fonts } from '@/theme';
+import { useAuth } from '@/lib/auth';
+import { RealFriendScreen } from '@/components/RealFriendScreen';
+
+export default function FriendRoute() {
+  const { demo } = useAuth();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return demo ? <DemoFriendPage /> : <RealFriendScreen id={id} />;
+}
 
 type View_ = 'misses' | 'photos';
 
-export default function FriendPage() {
+function DemoFriendPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const friend = people[id] ?? people.maya;
   const [view, setView] = useState<View_>('misses');
