@@ -15,6 +15,8 @@ export type RealNearMiss = {
   night: string;
   distance_m: number;
   place_name: string | null;
+  kind: 'crossed' | 'same_place';
+  overlap_min: number | null;
   my_lat: number;
   my_lng: number;
   their_lat: number;
@@ -44,6 +46,21 @@ export const otherName = (n: Pick<RealNearMiss, 'other_name' | 'other_username'>
   n.other_name?.split(' ')[0] || (n.other_username ? `@${n.other_username}` : 'A friend');
 
 export const placeLabel = (n: Pick<RealNearMiss, 'place_name'>) => n.place_name || 'Somewhere nearby';
+
+/**
+ * "crossed" means you were there at the same time. "same_place" means the same night,
+ * within a few hundred metres, but hours apart. Both are worth seeing; they read differently.
+ */
+export const nearLabel = (n: Pick<RealNearMiss, 'kind' | 'distance_m' | 'overlap_min'>) => {
+  if (n.kind === 'crossed') return `${n.distance_m}m apart`;
+  const apart = Math.abs(n.overlap_min ?? 0);
+  if (apart >= 90) return `${Math.round(apart / 60)} hours apart`;
+  if (apart >= 10) return `${Math.round(apart / 5) * 5} minutes apart`;
+  return 'Just missed';
+};
+
+export const kindLabel = (n: Pick<RealNearMiss, 'kind'>) =>
+  n.kind === 'crossed' ? 'Same time' : 'Same night';
 
 export const formatWhen = (iso: string) => {
   const d = new Date(iso);

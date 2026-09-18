@@ -1,5 +1,6 @@
-// Reads where and when your photos were taken and saves just that (never the photo) to Supabase.
-// Photos from the last 30 days are skipped. Hidden places (home, work) are dropped by the database.
+// Reads where and when your photos and videos were taken and saves just that (never the file) to
+// Supabase. Anything from the last 30 days is skipped. Hidden places (home, work) are dropped by
+// the database.
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
@@ -27,15 +28,22 @@ export type ScanResult = ScanProgress & { saved: number; moments: number };
 export type ScanStats = { points: number; moments: number; oldest: string | null; newest: string | null; lastSaved: string | null };
 
 // Remembers how far we got, per user, so a scan can resume and a rescan only reads what's new.
-type Cursor = { newest: number | null; oldest: number | null; complete: boolean; scanned: number; withLocation: number };
+// Bump SCAN_VERSION whenever we start looking at something we didn't before (videos, say), so
+// everyone's next scan walks the whole library again instead of resuming from the old mark.
+const SCAN_VERSION = 2;
+type Cursor = { v?: number; newest: number | null; oldest: number | null; complete: boolean; scanned: number; withLocation: number };
 const cursorKey = (uid: string) => `nearmiss.scan.${uid}`;
+const freshCursor = (): Cursor => ({ v: SCAN_VERSION, newest: null, oldest: null, complete: false, scanned: 0, withLocation: 0 });
 
 async function readCursor(uid: string): Promise<Cursor> {
   try {
     const raw = await AsyncStorage.getItem(cursorKey(uid));
-    if (raw) return JSON.parse(raw) as Cursor;
+    if (raw) {
+      const c = JSON.parse(raw) as Cursor;
+      if (c.v === SCAN_VERSION) return c;
+    }
   } catch { /* start fresh */ }
-  return { newest: null, oldest: null, complete: false, scanned: 0, withLocation: 0 };
+  return freshCursor();
 }
 const writeCursor = (uid: string, c: Cursor) => AsyncStorage.setItem(cursorKey(uid), JSON.stringify(c)).catch(() => {});
 export const resetScanCursor = (uid: string) => AsyncStorage.removeItem(cursorKey(uid)).catch(() => {});
@@ -59,27 +67,31 @@ function toAccess(p: { status: string; granted: boolean; accessPrivileges?: stri
   return 'denied';
 }
 
+// Videos count too: a clip from a concert is as good a "you were here" as a photo.
+const MEDIA: ('photo' | 'video')[] = ['photo', 'video'];
+const mediaTypes = (ML: ML) => [ML.MediaType.IMAGE, ML.MediaType.VIDEO];
+
 export async function getPhotoAccess(): Promise<Access> {
   const ML = lib();
   if (!ML) return 'unavailable';
-  return toAccess(await ML.getPermissionsAsync(false, ['photo']));
+  return toAccess(await ML.getPermissionsAsync(false, MEDIA));
 }
 
 export async function requestPhotoAccess(): Promise<Access> {
   const ML = lib();
   if (!ML) return 'unavailable';
-  return toAccess(await ML.requestPermissionsAsync(false, ['photo']));
+  return toAccess(await ML.requestPermissionsAsync(false, MEDIA));
 }
 
 /** On iOS "Limited Access", lets the person pick more photos. */
 export async function choosePhotos() {
   const ML = lib();
-  if (ML) await ML.presentPermissionsPicker(['photo']).catch(() => {});
+  if (ML) await ML.presentPermissionsPicker(MEDIA).catch(() => {});
 }
 
 async function pageBefore(ML: ML, beforeMs: number, afterMs: number | null): Promise<{ id: string; t: number }[]> {
   let q = new ML.Query()
-    .eq(ML.AssetField.MEDIA_TYPE, ML.MediaType.IMAGE)
+    .within(ML.AssetField.MEDIA_TYPE, mediaTypes(ML))
     .lt(ML.AssetField.CREATION_TIME, beforeMs);
   if (afterMs != null) q = q.gt(ML.AssetField.CREATION_TIME, afterMs);
   const rows = await q.orderBy({ key: ML.AssetField.CREATION_TIME, ascending: false }).limit(PAGE).exeForMetadata();
@@ -92,7 +104,7 @@ async function countBefore(ML: ML, beforeMs: number): Promise<number> {
   let before = beforeMs;
   for (;;) {
     const rows = await new ML.Query()
-      .eq(ML.AssetField.MEDIA_TYPE, ML.MediaType.IMAGE)
+      .within(ML.AssetField.MEDIA_TYPE, mediaTypes(ML))
       .lt(ML.AssetField.CREATION_TIME, before)
       .orderBy({ key: ML.AssetField.CREATION_TIME, ascending: false })
       .limit(2000)
@@ -156,7 +168,7 @@ export async function scanPhotos(opts: { onProgress?: (p: ScanProgress) => void;
   // If the saved data was cleared elsewhere, start over.
   const stats = await getScanStats();
   if (stats && stats.points === 0 && (cur.complete || cur.oldest != null)) {
-    Object.assign(cur, { newest: null, oldest: null, complete: false, scanned: 0, withLocation: 0 });
+    Object.assign(cur, freshCursor());
   }
   const p: ScanProgress = { phase: 'counting', total: 0, scanned: cur.scanned, withLocation: cur.withLocation, oldest: cur.oldest };
   const emit = () => opts.onProgress?.({ ...p });

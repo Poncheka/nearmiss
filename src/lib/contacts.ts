@@ -159,6 +159,16 @@ export const useContacts = create<ContactsState>((set, get) => ({
   reset: () => set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [] }),
 }));
 
+/** Find someone by their exact @username (for adding a friend who isn't in your contacts). */
+export async function findByUsername(handle: string): Promise<AppUser | null> {
+  const clean = handle.trim().replace(/^@/, '').toLowerCase();
+  if (!/^[a-z0-9_.]{3,24}$/.test(clean)) return null;
+  const { data, error } = await supabase.rpc('find_user_by_username', { handle: clean });
+  if (error) throw new Error(error.message);
+  const row = (data ?? [])[0] as AppUser | undefined;
+  return row ?? null;
+}
+
 /** iOS 18+ "limited" contacts: let the person pick more. */
 export async function chooseMoreContacts() {
   const C = lib();

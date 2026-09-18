@@ -6,7 +6,7 @@ import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot } from '@/
 import { Avatar, AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { useAuth } from '@/lib/auth';
-import { formatWhen, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
+import { formatWhen, kindLabel, nearLabel, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
 import { MiniMap } from '@/components/art';
 import { activity, nearMisses, NearMiss, people } from '@/data/mock';
 import { isBeforeMet, useStore } from '@/state/store';
@@ -43,6 +43,7 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
   const mapHeight = Math.round(width * 0.72);
   const tags: { label: string; tone: ChipTone }[] = [];
   if (nm.is_new) tags.push({ label: 'New', tone: 'violet' });
+  tags.push({ label: kindLabel(nm), tone: nm.kind === 'crossed' ? 'violet' : 'outline' });
   if (nm.via_name) tags.push({ label: `Friend of ${nm.via_name.split(' ')[0]}`, tone: 'green' });
   if (nm.is_before_met) tags.push({ label: 'Before you met', tone: 'coral' });
   return (
@@ -62,7 +63,7 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
         <View>
           <PairMap me={{ latitude: nm.my_lat, longitude: nm.my_lng }} them={{ latitude: nm.their_lat, longitude: nm.their_lng }} height={mapHeight} width={width} />
           <View style={{ position: 'absolute', left: 12, top: 12, backgroundColor: colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 10, paddingVertical: 4 }}>
-            <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.ink }}>{nm.distance_m}m apart</Text>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.ink }}>{nearLabel(nm)}</Text>
           </View>
         </View>
         <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 8 }}>
@@ -71,7 +72,11 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
               {tags.map((t) => <Chip key={t.label} label={t.label} tone={t.tone} />)}
             </View>
           )}
-          <Body size={15} color={colors.text2}>You and {name} were {nm.distance_m}m apart{nm.place_name ? ` at ${place.split(',')[0]}` : ''}.</Body>
+          <Body size={15} color={colors.text2}>
+            {nm.kind === 'crossed'
+              ? `You and ${name} were ${nm.distance_m}m apart${nm.place_name ? ` at ${place.split(',')[0]}` : ''}.`
+              : `You and ${name} were both ${nm.place_name ? `at ${place.split(',')[0]}` : 'in the same spot'} that night, ${nearLabel(nm).toLowerCase()}.`}
+          </Body>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <MessageCircle size={16} color={colors.muted} strokeWidth={2} />

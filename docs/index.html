@@ -46,16 +46,14 @@
   .note { font-size: 14px; color: var(--muted); margin: 12px 4px 0; min-height: 21px; }
   .note.ok { color: #3D6B45; font-weight: 600; }
   .note.err { color: #B3261E; }
-  .points { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
-  .points span { font-size: 14px; font-weight: 600; background: var(--sand); padding: 6px 12px; border-radius: 999px; }
 
   /* The phone-post illustration */
   .post { background: var(--card); border: 1px solid var(--border); border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(35,31,26,0.25); max-width: 400px; justify-self: center; width: 100%; transform: rotate(2deg); }
   .post-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
   .pair { position: relative; width: 58px; height: 36px; flex: none; }
-  .pair i { position: absolute; top: 0; width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 14px; }
-  .pair i:first-child { left: 0; background: #D9D0F7; }
-  .pair i:last-child { left: 22px; background: #F6C9B9; }
+  .pair img { position: absolute; top: 0; width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff; object-fit: cover; background: var(--sand); }
+  .pair img:first-child { left: 0; }
+  .pair img:last-child { left: 22px; }
   .post-title { font-weight: 700; line-height: 1.25; }
   .post-title span { color: var(--muted); font-weight: 600; }
   .post-sub { font-size: 13px; color: var(--muted); }
@@ -93,7 +91,7 @@
         <div><strong id="invite-name">A friend</strong> invited you to find out where you almost crossed paths.</div>
       </div>
       <h1>Who did you almost meet?</h1>
-      <p class="lede">Near Miss looks at when and where your photos were taken and shows the times you and your friends were steps apart, sometimes years before you met.</p>
+      <p class="lede">Near Miss finds out the times you and your friends were steps apart, sometimes years before you met.</p>
 
       <form id="waitlist" novalidate>
         <label for="email" style="position:absolute;left:-9999px">Email</label>
@@ -101,17 +99,11 @@
         <button type="submit" id="submit">Get early access</button>
       </form>
       <p class="note" id="note">We'll email you once, when it's ready.</p>
-
-      <div class="points">
-        <span>Photos stay on your phone</span>
-        <span>Only friends see near misses</span>
-        <span>Home and work stay hidden</span>
-      </div>
     </section>
 
     <aside class="post" aria-hidden="true">
       <div class="post-head">
-        <div class="pair"><i>J</i><i>M</i></div>
+        <div class="pair"><img src="/you.jpg" alt=""><img src="/maya.jpg" alt=""></div>
         <div>
           <div class="post-title">The Fillmore <span>· You + Maya</span></div>
           <div class="post-sub">Fri, Mar 4, 2016 · 9:41pm</div>

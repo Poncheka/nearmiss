@@ -6,7 +6,7 @@ import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { addComment, formatWhen, giveFeedback, loadComments, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
+import { addComment, formatWhen, giveFeedback, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
 import { colors, fonts, pastel, radius } from '@/theme';
 
 const FEEDBACK: { kind: 'together' | 'not_interesting'; label: string }[] = [
@@ -100,10 +100,16 @@ export function RealNearMissScreen({ id }: { id: string }) {
             <Body size={17} color={colors.text2}>{placeLabel(nm)}</Body>
             <Body size={17} color={colors.text2}>{when.date} · {when.time}</Body>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 2 }}>
-              <Chip label={`${nm.distance_m}m apart`} tone="outline" />
+              <Chip label={kindLabel(nm)} tone={nm.kind === 'crossed' ? 'violet' : 'outline'} />
+              <Chip label={nm.kind === 'crossed' ? `${nm.distance_m}m apart` : nearLabel(nm)} tone="outline" />
               {nm.via_name ? <Chip label={`Friend of ${nm.via_name.split(' ')[0]}`} tone="green" /> : null}
               {nm.is_before_met ? <Chip label="Before you met" tone="coral" /> : null}
             </View>
+            {nm.kind === 'same_place' ? (
+              <Body size={15} color={colors.muted}>
+                You didn't overlap — you were both around {placeLabel(nm).split(',')[0]} that night, {nm.distance_m}m apart at the closest.
+              </Body>
+            ) : null}
           </View>
 
           <Card style={{ overflow: 'hidden' }}>

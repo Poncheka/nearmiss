@@ -6,7 +6,7 @@ import { BookUser, Search, Share as ShareIcon } from 'lucide-react-native';
 import { Body, Button, Card, Display, Pill, ProgressDots, Screen, SectionLabel } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
-import { AppUser, chooseMoreContacts, FriendStatus, inviteLink, inviteMessage, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
+import { AppUser, chooseMoreContacts, findByUsername, FriendStatus, inviteLink, inviteMessage, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
 import { useAuth } from '@/lib/auth';
 import { colors, fonts, pastel, radius } from '@/theme';
 
@@ -32,6 +32,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [demoStatus, setDemoStatus] = useState<Record<string, FriendStatus>>({ sam: 'friends' });
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [found, setFound] = useState<AppUser | null>(null);
 
   useEffect(() => {
     if (demo) return;
@@ -50,6 +51,18 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     else useContacts.getState().refreshFriends();
   }, [demo]));
 
+  // Typing a username looks that person up, so you can add someone who isn't in your contacts.
+  useEffect(() => {
+    if (demo) return;
+    const handle = q.trim().replace(/^@/, '').toLowerCase();
+    if (!/^[a-z0-9_.]{3,24}$/.test(handle)) { setFound(null); return; }
+    let live = true;
+    const t = setTimeout(() => {
+      findByUsername(handle).then((u) => { if (live) setFound(u); }).catch(() => {});
+    }, 350);
+    return () => { live = false; clearTimeout(t); };
+  }, [q, demo]);
+
   const link = inviteLink(profile?.username);
   const copy = async () => {
     await Clipboard.setStringAsync(link).catch(() => {});
@@ -66,6 +79,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const sections = useMemo(() => {
     const users = new Map<string, AppUser>();
     for (const u of demo ? demoOnApp : c.onApp) users.set(u.id, u);
+    if (found) users.set(found.id, found);
     if (!demo) for (const f of c.friends) if (!users.has(f.id)) users.set(f.id, f);
     const match = (s: string) => !query || s.toLowerCase().includes(query);
     const userRows = [...users.values()]
@@ -76,7 +90,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     if (userRows.length) out.push({ key: 'users', title: 'On Near Miss', data: userRows.map((user) => ({ kind: 'user', user })) });
     if (contactRows.length) out.push({ key: 'contacts', title: 'Invite from your contacts', data: contactRows.map((contact) => ({ kind: 'contact', contact })) });
     return out;
-  }, [demo, c.onApp, c.friends, c.contacts, statuses, query]);
+  }, [demo, c.onApp, c.friends, c.contacts, statuses, query, found]);
 
   const add = async (id: string) => {
     if (demo) return setDemoStatus((s) => ({ ...s, [id]: 'requested' }));
@@ -167,13 +181,13 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
             </View>
           )}
         </View>
-        {hasAccess && (
+        {(hasAccess || !demo) && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder }}>
             <Search size={18} color={colors.muted} strokeWidth={2} />
             <TextInput
               value={q}
               onChangeText={setQ}
-              placeholder={(demo ? demoContacts : c.contacts).length ? `Search ${(demo ? demoContacts : c.contacts).length.toLocaleString('en-US')} contacts` : 'Search contacts'}
+              placeholder={(demo ? demoContacts : c.contacts).length ? `Search contacts or @username` : 'Search @username'}
               placeholderTextColor={colors.faint}
               autoCorrect={false}
               style={{ flex: 1, fontFamily: fonts.regular, fontSize: 16, color: colors.ink, height: 44 }}
