@@ -34,7 +34,8 @@ export default function EmailSignIn() {
   };
 
   const openMail = () => Linking.openURL(Platform.OS === 'ios' ? 'message://' : 'mailto:').catch(() => {});
-  const shownError = error || linkError;
+  // A link failure explains itself; a stale local error from a cancelled request does not.
+  const shownError = linkError || error;
 
   return (
     <Screen edges={['top', 'bottom']}>
