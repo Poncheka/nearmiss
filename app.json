@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.poncheka.nearmiss",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocalNetworkUsageDescription": "Used only by Near Miss development builds to reach a development server on your own network."
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -147,7 +148,7 @@
           "locationWhenInUsePermission": "Near Miss uses your location once, only if you choose to mark home or work as a hidden place.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
-          "motionUsagePermission": false
+          "motionUsagePermission": "Near Miss never asks for motion data. This note is required because the location library the app uses is able to read motion activity."
         }
       ],
       [
