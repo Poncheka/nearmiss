@@ -125,9 +125,13 @@ export const useSharedPhotos = create<State>((set, get) => ({
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Picker = require('expo-image-picker') as typeof import('expo-image-picker');
-    const perm = await Picker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) throw new Error('Near Miss needs access to your photos to share one.');
 
+    // No permission request here, deliberately.
+    //
+    // The system picker runs outside the app and hands back only what the person chose, so iOS
+    // grants it nothing and asks for nothing. Requesting library access first was asking for a
+    // permission this screen does not use, which is how someone who had already said yes at
+    // sign-up got asked a second time. AvatarPicker has always launched it this way.
     const picked = await Picker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'],
       quality: 0.8,

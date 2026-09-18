@@ -12,7 +12,7 @@ import { useScan } from '@/state/scan';
 import { colors } from '@/theme';
 
 type Audience = Settings['audience'];
-type NotifKey = 'notify_photos' | 'notify_replies' | 'notify_joins' | 'notify_weekly_report' | 'notify_on_this_day';
+type NotifKey = 'notify_near_misses' | 'notify_photos' | 'notify_replies' | 'notify_joins' | 'notify_weekly_report' | 'notify_on_this_day';
 
 const audienceOptions: { id: Audience; label: string; sub: string }[] = [
   { id: 'friends', label: 'Friends only', sub: 'People you have added' },
@@ -21,6 +21,7 @@ const audienceOptions: { id: Audience; label: string; sub: string }[] = [
 
 
 const notifOptions: { id: NotifKey; label: string; sub: string }[] = [
+  { id: 'notify_near_misses', label: 'New near misses', sub: 'When one is found' },
   { id: 'notify_photos', label: 'Photos shared with you', sub: 'Right away' },
   { id: 'notify_replies', label: 'Replies', sub: 'Bundled per near miss' },
   { id: 'notify_joins', label: 'Friends joining', sub: 'With your near misses together' },

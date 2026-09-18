@@ -5,6 +5,7 @@ import * as Linking from 'expo-linking';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { unregisterPush } from '@/lib/push';
 import { useScan } from '@/state/scan';
 import { resetScanCursor } from '@/lib/photoScan';
 import { usePlaces } from '@/lib/places';
@@ -27,6 +28,7 @@ export type Settings = {
   notify_photos: boolean;
   notify_replies: boolean;
   notify_joins: boolean;
+  notify_near_misses: boolean;
   notify_weekly_report: boolean;
   notify_on_this_day: boolean;
   onboarded_at: string | null;
@@ -37,6 +39,7 @@ const defaultSettings: Settings = {
   notify_photos: true,
   notify_replies: true,
   notify_joins: true,
+  notify_near_misses: true,
   notify_weekly_report: true,
   notify_on_this_day: false,
   onboarded_at: null,
@@ -243,6 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useContacts.getState().reset();
     useNearMisses.getState().reset();
     useSharedPhotos.getState().reset();
+    // Before the session goes, so this phone stops receiving their notifications.
+    await unregisterPush();
     await supabase.auth.signOut();
   }, [demo]);
 

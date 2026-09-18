@@ -8,6 +8,7 @@ import { PairMap } from '@/components/map/PairMap';
 import { useAuth } from '@/lib/auth';
 import { barelyMissedLine, formatWhen, isBarelyMissed, kindLabel, nearLabel, NeedsMetOn, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
 import { occasionFor } from '@/lib/occasions';
+import { PushOffer } from '@/components/PushOffer';
 import { useActivity } from '@/lib/activity';
 import { MiniMap } from '@/components/art';
 import { activity, nearMisses, NearMiss, people } from '@/data/mock';
@@ -22,7 +23,8 @@ type Row =
   | { kind: 'post'; nm: NearMiss }
   | { kind: 'real'; nm: RealNearMiss }
   | { kind: 'ask'; friend: NeedsMetOn }
-  | { kind: 'since'; count: number; open: boolean };
+  | { kind: 'since'; count: number; open: boolean }
+  | { kind: 'push' };
 
 const PASTELS = [pastel.lilac, pastel.peach, pastel.sage, pastel.butter, pastel.sky];
 const colorFor = (key: string) => PASTELS[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % PASTELS.length];
@@ -280,6 +282,9 @@ export default function Feed() {
         }
       };
       withYears(before);
+      // Under the first near miss, where the question answers itself.
+      const first = out.findIndex((r) => r.kind === 'real');
+      if (first !== -1) out.splice(first + 1, 0, { kind: 'push' });
       // A guess later than every near miss we have: ask at the end rather than never.
       for (const f of pending) if (!asked.has(f.friend_id)) out.push({ kind: 'ask', friend: f });
       if (since.length) {
@@ -360,6 +365,7 @@ export default function Feed() {
           r.kind === 'year' ? `y${r.year}`
           : r.kind === 'ask' ? `ask${r.friend.friend_id}`
           : r.kind === 'since' ? 'since'
+          : r.kind === 'push' ? 'push'
           : r.nm.id}
         initialNumToRender={4}
         windowSize={5}
@@ -384,6 +390,8 @@ export default function Feed() {
           <RealPost nm={item.nm} width={cardWidth} myBirthday={profile?.birthday} />
         ) : item.kind === 'year' ? (
           <Text style={{ fontFamily: fonts.display, fontSize: 20, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.year}</Text>
+        ) : item.kind === 'push' ? (
+          <PushOffer />
         ) : item.kind === 'ask' ? (
           <AskWhenMet friend={item.friend} />
         ) : item.kind === 'since' ? (

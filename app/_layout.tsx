@@ -13,6 +13,7 @@ import { Figtree_600SemiBold } from '@expo-google-fonts/figtree/600SemiBold';
 import { Figtree_700Bold } from '@expo-google-fonts/figtree/700Bold';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useAutoUpdate } from '@/lib/updates';
+import { usePushRegistration } from '@/lib/push';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -21,6 +22,9 @@ function RootNavigator() {
   const { loading, signedIn, onboarded, userLoaded } = useAuth();
   // Pick up new code on launch and on returning to the app, rather than a launch later.
   useAutoUpdate();
+  // Silent: refreshes the push token only where permission is already granted. The one prompt
+  // lives in the feed, under the first near miss.
+  usePushRegistration(signedIn);
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();

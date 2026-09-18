@@ -1,0 +1,121 @@
+// Getting told when something happens.
+//
+// Two rules here, both learned the hard way in this app. Ask once, and only when the person has
+// a reason to say yes: iOS gives you exactly one chance at the notification prompt, and a cold
+// one during sign-up is how apps get denied forever. So the ask waits until there is a near miss
+// on screen worth hearing about, and if it is declined or dismissed it is never raised again.
+//
+// The second rule: never ask for something already granted. Registration runs silently whenever
+// permission is already there, which covers reinstalls where iOS remembers the answer.
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { supabase } from '@/lib/supabase';
+
+type Notifications = typeof import('expo-notifications');
+
+const OFFERED_KEY = 'nearmiss.push.offered';
+
+function lib(): Notifications | null {
+  if (Platform.OS === 'web') return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-notifications') as Notifications;
+  } catch {
+    return null;
+  }
+}
+
+const projectId = () =>
+  (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
+
+/** Hands the token to the server, where the push trigger reads it. Never throws. */
+async function register(): Promise<boolean> {
+  const N = lib();
+  if (!N) return false;
+  try {
+    const id = projectId();
+    const { data: token } = await N.getExpoPushTokenAsync(id ? { projectId: id } : undefined);
+    if (!token) return false;
+    const { error } = await supabase.rpc('register_push_token', {
+      t: token,
+      plat: Platform.OS === 'android' ? 'android' : 'ios',
+    });
+    return !error;
+  } catch {
+    // No network, or a simulator with no push support. Nothing to do about it.
+    return false;
+  }
+}
+
+/** True when there is a prompt left to show and we have not already used it. */
+export async function canOfferPush(): Promise<boolean> {
+  const N = lib();
+  if (!N) return false;
+  try {
+    if (await AsyncStorage.getItem(OFFERED_KEY)) return false;
+    const perm = await N.getPermissionsAsync();
+    return !perm.granted && perm.canAskAgain;
+  } catch {
+    return false;
+  }
+}
+
+/** Marks the offer as spent whatever the answer, so it is never raised twice. */
+export async function offerDeclined() {
+  await AsyncStorage.setItem(OFFERED_KEY, '1').catch(() => {});
+}
+
+/** The one prompt. Returns whether notifications are now on. */
+export async function askForPush(): Promise<boolean> {
+  const N = lib();
+  if (!N) return false;
+  await AsyncStorage.setItem(OFFERED_KEY, '1').catch(() => {});
+  try {
+    const perm = await N.requestPermissionsAsync();
+    if (!perm.granted) return false;
+    if (Platform.OS === 'android') {
+      await N.setNotificationChannelAsync('default', {
+        name: 'Near misses',
+        importance: N.AndroidImportance.DEFAULT,
+      }).catch(() => {});
+    }
+    return await register();
+  } catch {
+    return false;
+  }
+}
+
+/** Removes this device so a signed-out phone stops receiving someone else's notifications. */
+export async function unregisterPush() {
+  const N = lib();
+  if (!N) return;
+  try {
+    const id = projectId();
+    const { data: token } = await N.getExpoPushTokenAsync(id ? { projectId: id } : undefined);
+    if (token) await supabase.from('push_tokens').delete().eq('token', token);
+  } catch {
+    // Signing out still has to work.
+  }
+}
+
+/**
+ * Keeps the token current while signed in.
+ *
+ * Silent: it only registers when permission is already granted, so it can run on every launch
+ * without ever putting a prompt in front of anyone. Tokens can be reissued by the OS, which is
+ * why this runs each time rather than once.
+ */
+export function usePushRegistration(signedIn: boolean) {
+  useEffect(() => {
+    if (!signedIn) return;
+    const N = lib();
+    if (!N) return;
+    let live = true;
+    N.getPermissionsAsync()
+      .then((p) => { if (live && p.granted) register(); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [signedIn]);
+}
