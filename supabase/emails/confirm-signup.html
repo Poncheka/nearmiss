@@ -7,15 +7,15 @@
   address already has an account, and that is not something the person asking for a link can
   see or control. If only one of the two were branded, roughly half of new testers would get
   a default-styled email and wonder what they had signed up to. The template language is Go's,
-  so {{ .ConfirmationURL }} and {{ .Token }} are filled in by Supabase when it sends.
+  so {{ .ConfirmationURL }} is filled in by Supabase when it sends.
 
   Written for email clients, not browsers: tables rather than flexbox, inline styles rather
   than a stylesheet, and no web fonts, because Gmail and Outlook drop all three. The site's
   typefaces fall back to whatever the device has, which is why the stack ends in sans-serif.
 
-  Both ways in are here on purpose. The tap-the-button path is what most people use, but it
-  breaks when the link opens in a browser that isn't the one holding the session, so the
-  six-digit code is the escape hatch. Our first outside tester needed exactly that.
+  Link only, no six-digit code: the app has no screen to type a code into, so printing one
+  would be an instruction nobody can follow. Worth adding back alongside a code-entry screen,
+  as a fallback for when the link opens somewhere that can't complete the sign-in.
 -->
 <!doctype html>
 <html lang="en">
@@ -58,26 +58,13 @@
                 Tap the button to finish setting up. There's no password to choose.
               </p>
 
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;">
                 <tr>
                   <td align="center" bgcolor="#5B3FD0" style="border-radius:999px;">
                     <a href="{{ .ConfirmationURL }}"
                        style="display:inline-block; padding:15px 34px; font-family:Figtree,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:600; color:#FFFFFF; text-decoration:none; border-radius:999px;">
                       Start using Near Miss
                     </a>
-                  </td>
-                </tr>
-              </table>
-
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F7F2EA; border-radius:14px;">
-                <tr>
-                  <td style="padding:16px 18px;">
-                    <p style="margin:0 0 6px; font-family:Figtree,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; color:#7A7268;">
-                      Or type this code into the app
-                    </p>
-                    <p style="margin:0; font-family:'SF Mono',Menlo,Consolas,monospace; font-size:28px; font-weight:700; letter-spacing:0.16em; color:#231F1A;">
-                      {{ .Token }}
-                    </p>
                   </td>
                 </tr>
               </table>
