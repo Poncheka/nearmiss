@@ -9,6 +9,8 @@ export type RealNearMiss = {
   other_username: string | null;
   other_name: string | null;
   other_avatar_url: string | null;
+  /** Their birthday, if they set one. Only month and day are ever shown. */
+  other_birthday: string | null;
   via_id: string | null;
   via_name: string | null;
   closest_at: string;
@@ -72,7 +74,32 @@ export const nearLabel = (n: Pick<RealNearMiss, 'kind' | 'distance_m' | 'overlap
   const apart = Math.abs(n.overlap_min ?? 0);
   if (apart >= 90) return `${Math.round(apart / 60)} hours apart`;
   if (apart >= 10) return `${Math.round(apart / 5) * 5} minutes apart`;
-  return 'Just missed';
+  // The closest calls used to read "Just missed", which is the vaguest thing we could have said
+  // about the best thing that can happen here. Three minutes is the story; say three minutes.
+  if (apart >= 2) return `${apart} minutes apart`;
+  if (apart === 1) return 'One minute apart';
+  return 'Under a minute apart';
+};
+
+/**
+ * The ones worth raising your voice about: same place at the same moment and close enough to
+ * touch, or a gap you could have closed by tying a shoelace.
+ */
+export const isBarelyMissed = (n: Pick<RealNearMiss, 'kind' | 'distance_m' | 'overlap_min'>) =>
+  n.kind === 'crossed'
+    ? n.distance_m <= 30
+    : Math.abs(n.overlap_min ?? 0) <= 5;
+
+/** The headline for one of those, in the second person, with the number that makes it real. */
+export const barelyMissedLine = (n: Pick<RealNearMiss, 'kind' | 'distance_m' | 'overlap_min'>, name: string) => {
+  if (n.kind === 'crossed') {
+    if (n.distance_m <= 10) return `You were close enough to touch. ${n.distance_m}m apart, at the same moment.`;
+    return `You were ${n.distance_m}m apart at the same moment, and neither of you looked up.`;
+  }
+  const apart = Math.abs(n.overlap_min ?? 0);
+  if (apart < 1) return `You missed ${name} by less than a minute.`;
+  if (apart === 1) return `You missed ${name} by one minute.`;
+  return `You missed ${name} by ${apart} minutes.`;
 };
 
 export const kindLabel = (n: Pick<RealNearMiss, 'kind'>) =>

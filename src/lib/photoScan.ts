@@ -165,10 +165,26 @@ export async function scanPhotos(opts: { onProgress?: (p: ScanProgress) => void;
 
   const cutoff = Date.now() - RECENT_DAYS * DAY;
   const cur = await readCursor(uid);
-  // If the saved data was cleared elsewhere, start over.
   const stats = await getScanStats();
+  // If the saved data was cleared elsewhere, start over.
   if (stats && stats.points === 0 && (cur.complete || cur.oldest != null)) {
     Object.assign(cur, freshCursor());
+  }
+  // Reinstalled, or signed in on a second phone: the cursor is gone but the work isn't. The
+  // server already holds everything from `stats.oldest` forward, so pick up from there and read
+  // only what is genuinely missing, instead of walking the whole library again.
+  //
+  // Deliberately not marked complete. A scan that was interrupted last time left a partial
+  // history behind, and there is no way to tell that apart from a finished one, so the run below
+  // keeps working backwards from the oldest point on file.
+  if (stats && stats.points > 0 && cur.oldest == null && !cur.complete) {
+    const oldest = stats.oldest ? Date.parse(stats.oldest) : NaN;
+    if (Number.isFinite(oldest)) {
+      cur.oldest = oldest;
+      cur.newest = cutoff;
+      cur.withLocation = stats.points;
+      writeCursor(uid, cur);
+    }
   }
   const p: ScanProgress = { phase: 'counting', total: 0, scanned: cur.scanned, withLocation: cur.withLocation, oldest: cur.oldest };
   const emit = () => opts.onProgress?.({ ...p });

@@ -18,6 +18,8 @@ export type Profile = {
   name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  /** Optional. Only the month and day are ever shown, to mark a near miss that fell on it. */
+  birthday: string | null;
 };
 
 export type Settings = {
@@ -61,7 +63,7 @@ type AuthState = {
   signOut: () => Promise<void>;
   /** Permanently removes the account and everything stored with it. */
   deleteAccount: () => Promise<void>;
-  saveProfile: (p: { username: string; name: string; bio: string }) => Promise<void>;
+  saveProfile: (p: { username: string; name: string; bio: string; birthday?: string | null }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   finishOnboarding: () => Promise<void>;
   uploadAvatar: (image: { uri: string; mimeType?: string | null }) => Promise<void>;
@@ -91,7 +93,7 @@ function getGoogle(): GoogleModule {
   return googleModule;
 }
 
-const demoProfile: Profile = { id: 'demo', username: 'jeff', name: 'Jeff', bio: 'SF. Always at the show.', avatar_url: null };
+const demoProfile: Profile = { id: 'demo', username: 'jeff', name: 'Jeff', bio: 'SF. Always at the show.', avatar_url: null, birthday: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadUser = useCallback(async (userId: string) => {
     const [p, s] = await Promise.all([
-      supabase.from('profiles').select('id, username, name, bio, avatar_url').eq('id', userId).maybeSingle(),
+      supabase.from('profiles').select('id, username, name, bio, avatar_url, birthday').eq('id', userId).maybeSingle(),
       supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
     ]);
     if (p.data) setProfile(p.data);
@@ -258,14 +260,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserLoaded(false);
   }, [demo, session, signOut]);
 
-  const saveProfile = useCallback(async ({ username, name, bio }: { username: string; name: string; bio: string }) => {
+  const saveProfile = useCallback(async ({ username, name, bio, birthday }: { username: string; name: string; bio: string; birthday?: string | null }) => {
     const clean = username.trim().replace(/^@/, '').toLowerCase();
     if (!/^[a-z0-9_.]{3,24}$/.test(clean)) {
       throw new UserFacingError('Usernames are 3–24 characters: letters, numbers, dots and underscores.');
     }
-    const patch = { username: clean, name: name.trim() || null, bio: bio.trim() || null };
+    const patch: Record<string, unknown> = { username: clean, name: name.trim() || null, bio: bio.trim() || null };
+    // Left out entirely when not passed, so saving a name can't wipe a birthday set elsewhere.
+    if (birthday !== undefined) patch.birthday = birthday;
     if (demo || !session) { setProfile((p) => ({ ...(p ?? demoProfile), ...patch })); return; }
-    const { data, error } = await supabase.from('profiles').update(patch).eq('id', session.user.id).select('id, username, name, bio, avatar_url').single();
+    const { data, error } = await supabase.from('profiles').update(patch).eq('id', session.user.id).select('id, username, name, bio, avatar_url, birthday').single();
     if (error) {
       if (error.code === '23505') throw new UserFacingError(`@${clean} is taken. Try another.`);
       throw new UserFacingError(error.message);
@@ -292,7 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error: upErr } = await supabase.storage.from('avatars').upload(path, body, { contentType: type, upsert: false });
     if (upErr) throw new UserFacingError(`Couldn't upload your photo: ${upErr.message}`);
     const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
-    const { data, error } = await supabase.from('profiles').update({ avatar_url: pub.publicUrl }).eq('id', uid).select('id, username, name, bio, avatar_url').single();
+    const { data, error } = await supabase.from('profiles').update({ avatar_url: pub.publicUrl }).eq('id', uid).select('id, username, name, bio, avatar_url, birthday').single();
     if (error) throw new UserFacingError(error.message);
     const old = profile?.avatar_url?.split('/avatars/')[1];
     setProfile(data);

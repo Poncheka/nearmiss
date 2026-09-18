@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Body, Card, Divider, IconButton, Screen, SectionLabel, TextLink, Toggle } from '@/components/ui';
 import { Settings, useAuth } from '@/lib/auth';
 import { Access, choosePhotos, clearScanData, getPhotoAccess, photoScanAvailable, requestPhotoAccess } from '@/lib/photoScan';
+import { timelineStats } from '@/lib/timelineImport';
 import { usePlaces } from '@/lib/places';
 import { useScan } from '@/state/scan';
 import { colors } from '@/theme';
@@ -171,6 +172,49 @@ function HiddenPlaces({ demo }: { demo: boolean }) {
   );
 }
 
+function LocationHistoryRow({ demo }: { demo: boolean }) {
+  const [points, setPoints] = useState<number | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    if (demo) { setPoints(0); return; }
+    timelineStats().then((s) => setPoints(s.points)).catch(() => setPoints(0));
+  }, [demo]));
+
+  return (
+    <Pressable onPress={() => router.push('/location-history')}>
+      <Group>
+        <Row last minHeight={56}>
+          <Label
+            title="Location history"
+            sub={points == null ? 'Checking…' : points > 0 ? `${points.toLocaleString()} places imported` : 'Import from Google Timeline'}
+          />
+          <ChevronRight size={16} color={colors.faint} />
+        </Row>
+      </Group>
+    </Pressable>
+  );
+}
+
+function BirthdayRow() {
+  const { profile } = useAuth();
+  const when = (() => {
+    const m = profile?.birthday?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return 'Not set';
+    return new Date(2000, Number(m[2]) - 1, Number(m[3])).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  })();
+
+  return (
+    <Pressable onPress={() => router.push('/birthday')}>
+      <Group>
+        <Row last minHeight={56}>
+          <Label title="Your birthday" sub={when === 'Not set' ? 'Marks near misses that fell on it' : when} />
+          <ChevronRight size={16} color={colors.faint} />
+        </Row>
+      </Group>
+    </Pressable>
+  );
+}
+
 function LocationRow() {
   const [state, setState] = useState<string | null>(null);
 
@@ -266,6 +310,14 @@ export default function SettingsScreen() {
 
         <SectionLabel>Your data</SectionLabel>
         <PhotoData demo={demo} />
+        <View style={{ height: 10 }} />
+        <LocationHistoryRow demo={demo} />
+        <Body size={13} color={colors.muted} style={{ paddingTop: 8, paddingHorizontal: 4 }}>
+          Photos only know where you were when you took one. Your Timeline knows the rest.
+        </Body>
+
+        <SectionLabel>Birthday</SectionLabel>
+        <BirthdayRow />
 
         <View style={{ height: 20 }} />
         <Group>

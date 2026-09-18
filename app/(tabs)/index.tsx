@@ -6,7 +6,8 @@ import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot } from '@/
 import { Avatar, AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { useAuth } from '@/lib/auth';
-import { formatWhen, kindLabel, nearLabel, NeedsMetOn, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
+import { barelyMissedLine, formatWhen, isBarelyMissed, kindLabel, nearLabel, NeedsMetOn, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
+import { occasionFor } from '@/lib/occasions';
 import { useActivity } from '@/lib/activity';
 import { MiniMap } from '@/components/art';
 import { activity, nearMisses, NearMiss, people } from '@/data/mock';
@@ -42,14 +43,17 @@ function RealPair({ nm, size = 34 }: { nm: RealNearMiss; size?: number }) {
   );
 }
 
-const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width: number }) {
+const RealPost = memo(function RealPost({ nm, width, myBirthday }: { nm: RealNearMiss; width: number; myBirthday?: string | null }) {
   const name = otherName(nm);
   const when = formatWhen(nm.closest_at);
   const place = placeLabel(nm);
   const mapHeight = Math.round(width * 0.72);
+  const barely = isBarelyMissed(nm);
+  const occasion = occasionFor(nm.closest_at, { mine: myBirthday, theirs: nm.other_birthday, theirName: nm.other_name });
   const tags: { label: string; tone: ChipTone }[] = [];
   if (nm.is_new) tags.push({ label: 'New', tone: 'violet' });
   tags.push({ label: kindLabel(nm), tone: nm.kind === 'crossed' ? 'violet' : 'outline' });
+  if (occasion) tags.push({ label: occasion.label, tone: occasion.loud ? 'green' : 'outline' });
   if (nm.via_name) tags.push({ label: `Friend of ${nm.via_name.split(' ')[0]}`, tone: 'green' });
   if (nm.is_before_met) tags.push({ label: 'Before you met', tone: 'coral' });
   return (
@@ -68,8 +72,8 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
         </View>
         <View>
           <PairMap me={{ latitude: nm.my_lat, longitude: nm.my_lng }} them={{ latitude: nm.their_lat, longitude: nm.their_lng }} height={mapHeight} width={width} />
-          <View style={{ position: 'absolute', left: 12, top: 12, backgroundColor: colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.inputBorder, paddingHorizontal: 10, paddingVertical: 4 }}>
-            <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.ink }}>{nearLabel(nm)}</Text>
+          <View style={{ position: 'absolute', left: 12, top: 12, backgroundColor: barely ? colors.violet : colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: barely ? colors.violet : colors.inputBorder, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: barely ? colors.white : colors.ink }}>{nearLabel(nm)}</Text>
           </View>
         </View>
         <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 8 }}>
@@ -78,11 +82,17 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
               {tags.map((t) => <Chip key={t.label} label={t.label} tone={t.tone} />)}
             </View>
           )}
-          <Body size={15} color={colors.text2}>
-            {nm.kind === 'crossed'
-              ? `You and ${name} were ${nm.distance_m}m apart${nm.place_name ? ` at ${place.split(',')[0]}` : ''}.`
-              : `You and ${name} were both ${nm.place_name ? `at ${place.split(',')[0]}` : 'in the same spot'} that night, ${nearLabel(nm).toLowerCase()}.`}
-          </Body>
+          {barely ? (
+            <Body size={16} weight="bold">
+              {barelyMissedLine(nm, name)}{nm.place_name ? ` At ${place.split(',')[0]}.` : ''}
+            </Body>
+          ) : (
+            <Body size={15} color={colors.text2}>
+              {nm.kind === 'crossed'
+                ? `You and ${name} were ${nm.distance_m}m apart${nm.place_name ? ` at ${place.split(',')[0]}` : ''}.`
+                : `You and ${name} were both ${nm.place_name ? `at ${place.split(',')[0]}` : 'in the same spot'} that night, ${nearLabel(nm).toLowerCase()}.`}
+            </Body>
+          )}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <MessageCircle size={16} color={colors.muted} strokeWidth={2} />
@@ -133,7 +143,7 @@ function AskWhenMet({ friend }: { friend: NeedsMetOn }) {
 
       <Body size={14} color={colors.text2}>
         {guessLabel
-          ? `Before this you turned up near each other every few months. After it, every few weeks — which usually means you already knew each other. Everything from after you met moves into its own section.`
+          ? `Before this you turned up near each other every few months. After it, every few weeks, which usually means you already knew each other. Everything from after you met moves into its own section.`
           : `Knowing this separates the near misses worth seeing from the days you already spent together.`}
       </Body>
 
@@ -210,13 +220,25 @@ const Post = memo(function Post({ nm, width, tags, unread, commentCount }: {
 
 export default function Feed() {
   const { width } = useWindowDimensions();
-  const { demo } = useAuth();
+  const { demo, profile } = useAuth();
   const real = useNearMisses();
   useFocusEffect(useCallback(() => {
     if (demo) return;
     useNearMisses.getState().load();
     useActivity.getState().refreshUnread();
   }, [demo]));
+
+  // The spinner belongs to the pull, not to the store.
+  //
+  // It used to read the store's `loading` flag, which is also set by the load that runs every
+  // time this tab regains focus. Coming back from a near miss, the list would find itself
+  // "refreshing" with nobody pulling it, and sit there held open until you pulled it again to
+  // dismiss it. Local state, cleared when the load settles, can't do that.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    useNearMisses.getState().load({ rematch: true }).finally(() => setRefreshing(false));
+  }, []);
   const met = useStore((s) => s.met);
   const unread = useStore((s) => s.unread);
   const seen = useStore((s) => s.seen);
@@ -343,7 +365,7 @@ export default function Feed() {
         windowSize={5}
         ListHeaderComponent={header}
         ListFooterComponent={footer}
-        refreshControl={demo ? undefined : <RefreshControl refreshing={real.loading && real.loaded} onRefresh={() => real.load({ rematch: true })} tintColor={colors.violet} />}
+        refreshControl={demo ? undefined : <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.violet} />}
         ListEmptyComponent={demo ? null : !real.loaded ? (
           <ActivityIndicator color={colors.violet} style={{ paddingTop: 60 }} />
         ) : (
@@ -359,7 +381,7 @@ export default function Feed() {
         )}
         contentContainerStyle={{ paddingHorizontal: PAD, paddingTop: 4, paddingBottom: 24, gap: 12, width: '100%', maxWidth: 640, alignSelf: 'center' }}
         renderItem={({ item }) => item.kind === 'real' ? (
-          <RealPost nm={item.nm} width={cardWidth} />
+          <RealPost nm={item.nm} width={cardWidth} myBirthday={profile?.birthday} />
         ) : item.kind === 'year' ? (
           <Text style={{ fontFamily: fonts.display, fontSize: 20, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.year}</Text>
         ) : item.kind === 'ask' ? (
@@ -372,7 +394,7 @@ export default function Feed() {
             <View style={{ flex: 1 }}>
               <Body size={15} weight="bold">Since you met</Body>
               <Body size={13} color={colors.muted}>
-                {item.count} {item.count === 1 ? 'day' : 'days'} you were both there — probably ones you remember
+                {item.count} {item.count === 1 ? 'day' : 'days'} you were both there, probably ones you remember
               </Body>
             </View>
             <Body size={14} weight="semibold" color={colors.violet}>{item.open ? 'Hide' : 'Show'}</Body>

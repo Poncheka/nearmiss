@@ -62,6 +62,8 @@ function RootNavigator() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="places" />
         <Stack.Screen name="location" />
+        <Stack.Screen name="location-history" />
+        <Stack.Screen name="birthday" />
         <Stack.Screen name="delete-account" />
       </Stack.Protected>
 

@@ -7,7 +7,8 @@ import { PairMap } from '@/components/map/PairMap';
 import { SharedVideo } from '@/components/SharedVideo';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { addComment, formatWhen, giveFeedback, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
+import { addComment, barelyMissedLine, formatWhen, giveFeedback, isBarelyMissed, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
+import { occasionFor } from '@/lib/occasions';
 import { SharedPhoto, useSharedPhotos } from '@/lib/sharedPhotos';
 import { colors, fonts, pastel, radius } from '@/theme';
 
@@ -17,7 +18,7 @@ const FEEDBACK: { kind: 'together' | 'not_interesting'; label: string }[] = [
 ];
 
 export function RealNearMissScreen({ id }: { id: string }) {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { width } = useWindowDimensions();
   const nm = useNearMisses((s) => s.items.find((x) => x.id === id));
   const loaded = useNearMisses((s) => s.loaded);
@@ -65,6 +66,12 @@ export function RealNearMissScreen({ id }: { id: string }) {
 
   const name = otherName(nm);
   const when = formatWhen(nm.closest_at);
+  const barely = isBarelyMissed(nm);
+  const occasion = occasionFor(nm.closest_at, {
+    mine: profile?.birthday,
+    theirs: nm.other_birthday,
+    theirName: nm.other_name,
+  });
   const me = session?.user.id;
 
   const send = async () => {
@@ -137,13 +144,20 @@ export function RealNearMissScreen({ id }: { id: string }) {
             <Body size={17} color={colors.text2}>{when.date} · {when.time}</Body>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 2 }}>
               <Chip label={kindLabel(nm)} tone={nm.kind === 'crossed' ? 'violet' : 'outline'} />
-              <Chip label={nm.kind === 'crossed' ? `${nm.distance_m}m apart` : nearLabel(nm)} tone="outline" />
+              <Chip label={nearLabel(nm)} tone={barely ? 'coral' : 'outline'} />
+              {occasion ? <Chip label={occasion.label} tone={occasion.loud ? 'green' : 'outline'} /> : null}
               {nm.via_name ? <Chip label={`Friend of ${nm.via_name.split(' ')[0]}`} tone="green" /> : null}
               {nm.is_before_met ? <Chip label="Before you met" tone="coral" /> : null}
             </View>
-            {nm.kind === 'same_place' ? (
+
+            {/* The closest calls get said out loud. Everything else stays in the chips. */}
+            {barely ? (
+              <Body size={19} weight="bold" style={{ paddingTop: 2 }}>
+                {barelyMissedLine(nm, name)}
+              </Body>
+            ) : nm.kind === 'same_place' ? (
               <Body size={15} color={colors.muted}>
-                You didn't overlap — you were both around {placeLabel(nm).split(',')[0]} that night, {nm.distance_m}m apart at the closest.
+                You didn't overlap. You were both around {placeLabel(nm).split(',')[0]} that night, {nm.distance_m}m apart at the closest.
               </Body>
             ) : null}
           </View>

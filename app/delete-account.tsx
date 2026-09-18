@@ -59,7 +59,7 @@ export default function DeleteAccount() {
           </Card>
 
           {demo ? (
-            <Body size={15} color={colors.muted}>Sample data — no account to delete.</Body>
+            <Body size={15} color={colors.muted}>Sample data. There's no account to delete.</Body>
           ) : (
             <>
               <View style={{ gap: 8 }}>

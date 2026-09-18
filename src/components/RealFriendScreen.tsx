@@ -96,7 +96,7 @@ export function RealFriendScreen({ id }: { id: string }) {
               <View style={{ flex: 1 }}>
                 <Body size={16} weight="semibold">When you met</Body>
                 <Body size={14} color={colors.muted}>
-                  {metKnown ? 'Tap to change' : `Not set — everything is in one list`}
+                  {metKnown ? 'Tap to change' : `Not set, so everything is in one list`}
                 </Body>
               </View>
               <ChevronRight size={18} color={colors.faint} />
