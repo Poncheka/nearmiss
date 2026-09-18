@@ -20,7 +20,7 @@ function UserAvatar({ id, name, url, size = 44 }: { id: string; name: string; ur
 
 // Sample-data mode (no account): the old demo people.
 const demoOnApp: AppUser[] = contactsOnApp.map((id) => ({ id, username: people[id].handle.slice(1), name: people[id].fullName, avatar_url: null }));
-const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name: c.name, initial: c.initial, phone: null, email: null, thumbnail: null, emailHashes: [] }));
+const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name: c.name, initial: c.initial, phone: null, email: null, thumbnail: null, emails: [], emailHashes: [] }));
 
 type Row = { kind: 'user'; user: AppUser } | { kind: 'contact'; contact: PhoneContact };
 

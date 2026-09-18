@@ -17,6 +17,8 @@ export type PhoneContact = {
   phone: string | null;   // best number to text
   email: string | null;
   thumbnail: string | null;
+  /** Raw addresses, kept on the phone. Only one-way hashes of these are ever sent. */
+  emails: string[];
   emailHashes: string[];
 };
 
@@ -55,11 +57,17 @@ export async function requestContactsAccess(): Promise<ContactsAccess> {
   return toAccess(await C.requestPermissionsAsync());
 }
 
+/**
+ * Reading contacts used to take many seconds on a real address book. Two reasons, both fixed:
+ * THUMBNAIL made the system decode an image for every single person before returning anything,
+ * and we hashed every email address up front. Names and emails are cheap, so we read those,
+ * show the list, and only hash when we're about to ask the server about them.
+ */
 async function readContacts(): Promise<PhoneContact[]> {
   const C = lib();
   if (!C) return [];
   const F = C.ContactField;
-  const rows = await C.Contact.getAllDetails([F.FULL_NAME, F.GIVEN_NAME, F.FAMILY_NAME, F.COMPANY, F.PHONES, F.EMAILS, F.THUMBNAIL] as const);
+  const rows = await C.Contact.getAllDetails([F.FULL_NAME, F.GIVEN_NAME, F.FAMILY_NAME, F.COMPANY, F.PHONES, F.EMAILS] as const);
   const out: PhoneContact[] = [];
   for (const r of rows) {
     const name = (r.fullName || [r.givenName, r.familyName].filter(Boolean).join(' ') || r.company || '').trim();
@@ -73,8 +81,9 @@ async function readContacts(): Promise<PhoneContact[]> {
       initial: name.charAt(0).toUpperCase(),
       phone: mobile,
       email: emails[0] ?? null,
-      thumbnail: r.thumbnail ?? null,
-      emailHashes: emails.map(hash),
+      thumbnail: null,
+      emails,
+      emailHashes: [],
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -119,16 +128,17 @@ export const useContacts = create<ContactsState>((set, get) => ({
       if (access !== 'granted' && access !== 'limited') return;
 
       const contacts = await readContacts();
-      const byHash = new Map<string, string>();
-      for (const c of contacts) for (const h of c.emailHashes) byHash.set(h, c.name);
-      const hashes = [...byHash.keys()];
+      // Render the list straight away; matching is a network round trip and can catch up.
+      set({ contacts, loading: false });
+
+      const hashes = [...new Set(contacts.flatMap((c) => c.emails.map(hash)))];
       const found = new Map<string, AppUser>();
       for (let i = 0; i < hashes.length; i += 2000) {
         const { data, error } = await supabase.rpc('find_contacts_on_app', { hashes: hashes.slice(i, i + 2000) });
         if (error) throw new Error(error.message);
         for (const u of (data ?? []) as AppUser[]) found.set(u.id, u);
       }
-      set({ contacts, onApp: [...found.values()].sort((a, b) => (a.name ?? a.username ?? '').localeCompare(b.name ?? b.username ?? '')) });
+      set({ onApp: [...found.values()].sort((a, b) => (a.name ?? a.username ?? '').localeCompare(b.name ?? b.username ?? '')) });
     } catch (e) {
       console.warn('Loading contacts failed', e);
       set({ error: e instanceof Error ? e.message : String(e) });

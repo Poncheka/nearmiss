@@ -103,28 +103,53 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
  * their shared life. We can't tell those apart from the outside, but they can, so ask.
  */
 function AskWhenMet({ friend }: { friend: NeedsMetOn }) {
+  const [busy, setBusy] = useState(false);
   const name = friend.name?.split(' ')[0] || (friend.username ? `@${friend.username}` : 'them');
+  const guessLabel = friend.guess
+    ? new Date(`${friend.guess}T12:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : null;
+
+  const open = () => router.push({ pathname: '/met/[id]', params: { id: friend.friend_id } });
+  const yes = async () => {
+    if (!friend.guess || busy) return;
+    setBusy(true);
+    try { await useNearMisses.getState().setMetOn(friend.friend_id, friend.guess); }
+    catch { open(); }
+    finally { setBusy(false); }
+  };
+
   return (
-    <Pressable
-      onPress={() => router.push({ pathname: '/met/[id]', params: { id: friend.friend_id } })}
-      style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violetTint, gap: 10 }}
-    >
+    <View style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violetTint, gap: 12, marginVertical: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         {friend.avatar_url
           ? <Image source={{ uri: friend.avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
           : <Avatar initial={name.replace('@', '').charAt(0).toUpperCase()} color={colorFor(friend.friend_id)} size={44} />}
         <View style={{ flex: 1, gap: 2 }}>
-          <Display size={20}>When did you and {name} meet?</Display>
-          <Body size={14} color={colors.text2}>
-            {friend.near_miss_count} near {friend.near_miss_count === 1 ? 'miss' : 'misses'} found. Knowing this
-            separates the ones worth seeing from the days you spent together.
-          </Body>
+          <Display size={20}>
+            {guessLabel ? `Did you two meet around ${guessLabel}?` : `When did you and ${name} meet?`}
+          </Display>
         </View>
       </View>
-      <View style={{ alignSelf: 'flex-start', minHeight: 40, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.violet, justifyContent: 'center' }}>
-        <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.white }}>Set the date</Text>
-      </View>
-    </Pressable>
+
+      <Body size={14} color={colors.text2}>
+        {guessLabel
+          ? `Before this you turned up near each other every few months. After it, every few weeks — which usually means you already knew each other. Everything from after you met moves into its own section.`
+          : `Knowing this separates the near misses worth seeing from the days you already spent together.`}
+      </Body>
+
+      {busy ? <ActivityIndicator color={colors.violet} /> : (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {friend.guess && (
+            <Pressable onPress={yes} style={{ minHeight: 40, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: colors.violet, justifyContent: 'center' }}>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.white }}>Yes, that's right</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={open} style={{ minHeight: 40, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder, justifyContent: 'center' }}>
+            <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.ink }}>{friend.guess ? 'Pick a date' : 'Set the date'}</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -212,17 +237,29 @@ export default function Feed() {
       const before = real.items.filter((n) => n.is_before_met || unknown.has(n.other_id));
       const since = real.items.filter((n) => !n.is_before_met && !unknown.has(n.other_id));
 
-      for (const friend of real.needsMetOn) out.push({ kind: 'ask', friend });
+      // Someone we can't guess a date for gets asked up front; there's nowhere better to put it.
+      for (const friend of real.needsMetOn.filter((f) => !f.guess)) out.push({ kind: 'ask', friend });
+
+      // The rest get asked at the exact point their near misses start clustering — the moment
+      // the feed stops being coincidences and starts being a shared life.
+      const pending = real.needsMetOn.filter((f) => f.guess);
+      const asked = new Set<string>();
 
       const withYears = (list: RealNearMiss[]) => {
         year = 0;
         for (const nm of list) {
+          const ask = pending.find(
+            (f) => !asked.has(f.friend_id) && f.friend_id === nm.other_id && f.guess != null && nm.night >= f.guess,
+          );
+          if (ask) { asked.add(ask.friend_id); out.push({ kind: 'ask', friend: ask }); }
           const y = new Date(nm.closest_at).getFullYear();
           if (y !== year) { year = y; out.push({ kind: 'year', year }); }
           out.push({ kind: 'real', nm });
         }
       };
       withYears(before);
+      // A guess later than every near miss we have: ask at the end rather than never.
+      for (const f of pending) if (!asked.has(f.friend_id)) out.push({ kind: 'ask', friend: f });
       if (since.length) {
         out.push({ kind: 'since', count: since.length, open: showSince });
         if (showSince) withYears(since);

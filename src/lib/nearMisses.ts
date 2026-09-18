@@ -37,6 +37,8 @@ export type NeedsMetOn = {
   avatar_url: string | null;
   near_miss_count: number;
   earliest: string;
+  /** Our guess at when they met: the first night that starts a cluster. Null if we can't tell. */
+  guess: string | null;
 };
 
 type State = {
