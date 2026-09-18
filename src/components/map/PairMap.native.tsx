@@ -8,6 +8,8 @@ export type PairMapProps = {
   height: number;
   width?: number;
   interactive?: boolean;
+  /** Take the whole parent instead of a fixed height (the full-screen map). */
+  fill?: boolean;
 };
 
 function Dot({ color }: { color: string }) {
@@ -15,7 +17,7 @@ function Dot({ color }: { color: string }) {
 }
 
 /** Real map of where the two of you were: violet is you, coral is them. */
-export function PairMap({ me, them, height, width, interactive = false }: PairMapProps) {
+export function PairMap({ me, them, height, width, interactive = false, fill = false }: PairMapProps) {
   const latitude = (me.latitude + them.latitude) / 2;
   const longitude = (me.longitude + them.longitude) / 2;
   // Frame both dots with some room around them (at least ~250m across).
@@ -23,7 +25,7 @@ export function PairMap({ me, them, height, width, interactive = false }: PairMa
   const delta = Math.max(span, 0.0025);
   return (
     <MapView
-      style={{ height, width: width ?? '100%' }}
+      style={fill ? { flex: 1 } : { height, width: width ?? '100%' }}
       initialRegion={{ latitude, longitude, latitudeDelta: delta, longitudeDelta: delta }}
       scrollEnabled={interactive}
       zoomEnabled={interactive}

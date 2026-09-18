@@ -7,6 +7,7 @@ export type PairMapProps = {
   height: number;
   width?: number;
   interactive?: boolean;
+  fill?: boolean;
 };
 
 const metersBetween = (a: PairMapProps['me'], b: PairMapProps['me']) => {

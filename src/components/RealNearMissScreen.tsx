@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUp, ChevronLeft } from 'lucide-react-native';
+import { ArrowUp, ChevronLeft, Maximize2 } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
@@ -112,14 +112,20 @@ export function RealNearMissScreen({ id }: { id: string }) {
             ) : null}
           </View>
 
+          {/* Tapping opens it full screen. Pinching here would fight the page's own scrolling. */}
           <Card style={{ overflow: 'hidden' }}>
-            <PairMap
-              me={{ latitude: nm.my_lat, longitude: nm.my_lng }}
-              them={{ latitude: nm.their_lat, longitude: nm.their_lng }}
-              height={240}
-              width={width - 42}
-              interactive
-            />
+            <Pressable onPress={() => router.push({ pathname: '/map/[id]', params: { id: nm.id } })}>
+              <PairMap
+                me={{ latitude: nm.my_lat, longitude: nm.my_lng }}
+                them={{ latitude: nm.their_lat, longitude: nm.their_lng }}
+                height={240}
+                width={width - 42}
+              />
+              <View style={{ position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34, borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder }}>
+                <Maximize2 size={14} color={colors.ink} strokeWidth={2.2} />
+                <Body size={13} weight="semibold">Open map</Body>
+              </View>
+            </Pressable>
             <View style={{ flexDirection: 'row', gap: 14, paddingHorizontal: 14, paddingVertical: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.violet }} />

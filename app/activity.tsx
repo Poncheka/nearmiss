@@ -15,6 +15,7 @@ const badgeFor: Record<string, string> = {
   friend_request: colors.violet,
   friend_accepted: colors.greenText,
   comment: colors.coral,
+  near_miss: colors.coral,
 };
 
 function RealRow({ item, last }: { item: RealActivity; last: boolean }) {

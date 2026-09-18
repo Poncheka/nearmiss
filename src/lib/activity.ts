@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
-export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment';
+export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss';
 
 export type RealActivity = {
   id: string;
@@ -40,6 +40,9 @@ export function activityText(a: RealActivity): string {
     case 'friend_request': return 'wants to be friends';
     case 'friend_accepted': return 'accepted your friend request';
     case 'comment': return a.place_name ? `commented on ${a.place_name.split(',')[0]}` : 'commented on a near miss';
+    // Deliberately no count: matching a new friend can add dozens at once, and any number
+    // we wrote here would be wrong by the time it was read.
+    case 'near_miss': return 'and you have new near misses';
     default: return 'did something';
   }
 }

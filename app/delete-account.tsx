@@ -6,13 +6,7 @@ import { Body, Button, Card, Display, IconButton, Screen, TextLink } from '@/com
 import { errorMessage, useAuth } from '@/lib/auth';
 import { colors, fonts, radius } from '@/theme';
 
-const GOES = [
-  'Every photo time and place you scanned, and the moments built from them',
-  'Every near miss you are part of — including the copy your friends see',
-  'Your profile, username and photo',
-  'Your friendships, comments and hidden places',
-  'The fingerprints of your contacts we used to find friends',
-];
+const GOES = ['Your scanned photo places', 'Your near misses', 'Your profile and friends'];
 
 export default function DeleteAccount() {
   const { profile, demo, deleteAccount } = useAuth();
@@ -52,13 +46,10 @@ export default function DeleteAccount() {
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, gap: 16 }} keyboardShouldPersistTaps="handled">
           <Display size={34}>Delete your account</Display>
-          <Body size={17} color={colors.text2}>
-            This happens immediately and there is no way to undo it. Your photos and videos are untouched —
-            they were always only on your phone — but everything Near Miss stored about you is removed.
-          </Body>
+          <Body size={17} color={colors.text2}>Permanent, and right away. Your photos stay on your phone.</Body>
 
-          <Card style={{ padding: 16, gap: 10 }}>
-            <Body size={15} weight="bold">What gets deleted</Body>
+          <Card style={{ padding: 16, gap: 8 }}>
+            <Body size={15} weight="bold">Deletes</Body>
             {GOES.map((g) => (
               <View key={g} style={{ flexDirection: 'row', gap: 10 }}>
                 <Body size={15} color={colors.faint}>·</Body>
@@ -67,14 +58,8 @@ export default function DeleteAccount() {
             ))}
           </Card>
 
-          <Body size={15} color={colors.text2}>
-            Comments your friends wrote stay with them until their own near miss goes, which happens at the
-            same time. If you only want to remove your location history, you can do that from the You tab
-            and keep your account.
-          </Body>
-
           {demo ? (
-            <Body size={15} color={colors.muted}>You are looking at sample data, so there is no account to delete.</Body>
+            <Body size={15} color={colors.muted}>Sample data — no account to delete.</Body>
           ) : (
             <>
               <View style={{ gap: 8 }}>
