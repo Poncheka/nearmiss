@@ -5,6 +5,7 @@ import { ArrowUp, ChevronLeft, ImagePlus, Maximize2 } from 'lucide-react-native'
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { SharedVideo } from '@/components/SharedVideo';
+import { ShareFromThatNight } from '@/components/ShareFromThatNight';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { addComment, barelyMissedLine, formatWhen, giveFeedback, isBarelyMissed, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
@@ -228,6 +229,9 @@ export function RealNearMissScreen({ id }: { id: string }) {
               );
             })}
           </View>
+
+          {/* Front and centre, with that night's photos already loaded. */}
+          <ShareFromThatNight nm={nm} name={name} theyShared={(photos ?? []).some((p) => !p.mine)} />
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 8 }}>
             {FEEDBACK.map((f) => <Pill key={f.kind} label={f.label} variant="white" height={36} textSize={14} onPress={() => feedback(f.kind, f.label)} />)}
