@@ -50,6 +50,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
         <Stack.Screen name="activity" />
         <Stack.Screen name="near-miss/[id]" />
+        <Stack.Screen name="met/[id]" />
         <Stack.Screen name="friend/[id]" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         {/* Opened from the You tab only */}

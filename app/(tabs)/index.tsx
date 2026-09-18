@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Bell, ChevronRight, MessageCircle } from 'lucide-react-native';
@@ -6,7 +6,8 @@ import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot } from '@/
 import { Avatar, AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { useAuth } from '@/lib/auth';
-import { formatWhen, kindLabel, nearLabel, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
+import { formatWhen, kindLabel, nearLabel, NeedsMetOn, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
+import { useActivity } from '@/lib/activity';
 import { MiniMap } from '@/components/art';
 import { activity, nearMisses, NearMiss, people } from '@/data/mock';
 import { isBeforeMet, useStore } from '@/state/store';
@@ -15,7 +16,12 @@ import { colors, fonts, pastel, radius } from '@/theme';
 const PAD = 16;
 const openNearMiss = (id: string) => router.push({ pathname: '/near-miss/[id]', params: { id } });
 
-type Row = { kind: 'year'; year: number } | { kind: 'post'; nm: NearMiss } | { kind: 'real'; nm: RealNearMiss };
+type Row =
+  | { kind: 'year'; year: number }
+  | { kind: 'post'; nm: NearMiss }
+  | { kind: 'real'; nm: RealNearMiss }
+  | { kind: 'ask'; friend: NeedsMetOn }
+  | { kind: 'since'; count: number; open: boolean };
 
 const PASTELS = [pastel.lilac, pastel.peach, pastel.sage, pastel.butter, pastel.sky];
 const colorFor = (key: string) => PASTELS[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % PASTELS.length];
@@ -92,6 +98,36 @@ const RealPost = memo(function RealPost({ nm, width }: { nm: RealNearMiss; width
   );
 });
 
+/**
+ * Two people who travel together produce a long run of near misses that are really just
+ * their shared life. We can't tell those apart from the outside, but they can, so ask.
+ */
+function AskWhenMet({ friend }: { friend: NeedsMetOn }) {
+  const name = friend.name?.split(' ')[0] || (friend.username ? `@${friend.username}` : 'them');
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/met/[id]', params: { id: friend.friend_id } })}
+      style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violetTint, gap: 10 }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        {friend.avatar_url
+          ? <Image source={{ uri: friend.avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+          : <Avatar initial={name.replace('@', '').charAt(0).toUpperCase()} color={colorFor(friend.friend_id)} size={44} />}
+        <View style={{ flex: 1, gap: 2 }}>
+          <Display size={20}>When did you and {name} meet?</Display>
+          <Body size={14} color={colors.text2}>
+            {friend.near_miss_count} near {friend.near_miss_count === 1 ? 'miss' : 'misses'} found. Knowing this
+            separates the ones worth seeing from the days you spent together.
+          </Body>
+        </View>
+      </View>
+      <View style={{ alignSelf: 'flex-start', minHeight: 40, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: colors.violet, justifyContent: 'center' }}>
+        <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.white }}>Set the date</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 const Post = memo(function Post({ nm, width, tags, unread, commentCount }: {
   nm: NearMiss; width: number; tags: { label: string; tone: ChipTone }[]; unread: number; commentCount: number;
 }) {
@@ -151,23 +187,45 @@ export default function Feed() {
   const { width } = useWindowDimensions();
   const { demo } = useAuth();
   const real = useNearMisses();
-  useFocusEffect(useCallback(() => { if (!demo) useNearMisses.getState().load(); }, [demo]));
+  useFocusEffect(useCallback(() => {
+    if (demo) return;
+    useNearMisses.getState().load();
+    useActivity.getState().refreshUnread();
+  }, [demo]));
   const met = useStore((s) => s.met);
   const unread = useStore((s) => s.unread);
   const seen = useStore((s) => s.seen);
   const comments = useStore((s) => s.comments);
   const activityRead = useStore((s) => s.activityRead);
   const cardWidth = Math.min(width, 640) - PAD * 2 - 2;
+  const [showSince, setShowSince] = useState(false);
 
   // Oldest first, with a year label whenever the year changes.
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     let year = 0;
     if (!demo) {
-      for (const nm of real.items) {
-        const y = new Date(nm.closest_at).getFullYear();
-        if (y !== year) { year = y; out.push({ kind: 'year', year }); }
-        out.push({ kind: 'real', nm });
+      // A near miss from after you met is usually a day you already remember — the trip you
+      // took together, not a time you almost crossed paths. Keep those out of the main feed.
+      // Friends whose meeting date we don't know yet stay in the feed, and we ask about them.
+      const unknown = new Set(real.needsMetOn.map((n) => n.friend_id));
+      const before = real.items.filter((n) => n.is_before_met || unknown.has(n.other_id));
+      const since = real.items.filter((n) => !n.is_before_met && !unknown.has(n.other_id));
+
+      for (const friend of real.needsMetOn) out.push({ kind: 'ask', friend });
+
+      const withYears = (list: RealNearMiss[]) => {
+        year = 0;
+        for (const nm of list) {
+          const y = new Date(nm.closest_at).getFullYear();
+          if (y !== year) { year = y; out.push({ kind: 'year', year }); }
+          out.push({ kind: 'real', nm });
+        }
+      };
+      withYears(before);
+      if (since.length) {
+        out.push({ kind: 'since', count: since.length, open: showSince });
+        if (showSince) withYears(since);
       }
       return out;
     }
@@ -176,7 +234,7 @@ export default function Feed() {
       out.push({ kind: 'post', nm });
     }
     return out;
-  }, [demo, real.items]);
+  }, [demo, real.items, real.needsMetOn, showSince]);
 
   const tagsFor = (nm: NearMiss) => {
     const t: { label: string; tone: ChipTone }[] = [];
@@ -186,7 +244,8 @@ export default function Feed() {
     return t;
   };
 
-  const unreadActivity = !demo || activityRead ? 0 : activity.filter((a) => a.fresh).length;
+  const realUnread = useActivity((s) => s.unread);
+  const unreadActivity = demo ? (activityRead ? 0 : activity.filter((a) => a.fresh).length) : realUnread;
 
   const header = !demo ? null : (
     <Pressable onPress={() => router.push('/reveal')} style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violet, gap: 12, marginBottom: 4 }}>
@@ -238,7 +297,11 @@ export default function Feed() {
 
       <FlatList
         data={rows}
-        keyExtractor={(r) => (r.kind === 'year' ? `y${r.year}` : r.nm.id)}
+        keyExtractor={(r) =>
+          r.kind === 'year' ? `y${r.year}`
+          : r.kind === 'ask' ? `ask${r.friend.friend_id}`
+          : r.kind === 'since' ? 'since'
+          : r.nm.id}
         initialNumToRender={4}
         windowSize={5}
         ListHeaderComponent={header}
@@ -262,6 +325,21 @@ export default function Feed() {
           <RealPost nm={item.nm} width={cardWidth} />
         ) : item.kind === 'year' ? (
           <Text style={{ fontFamily: fonts.display, fontSize: 20, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.year}</Text>
+        ) : item.kind === 'ask' ? (
+          <AskWhenMet friend={item.friend} />
+        ) : item.kind === 'since' ? (
+          <Pressable
+            onPress={() => setShowSince((v) => !v)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 14, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radius.cardLg, backgroundColor: colors.sand }}
+          >
+            <View style={{ flex: 1 }}>
+              <Body size={15} weight="bold">Since you met</Body>
+              <Body size={13} color={colors.muted}>
+                {item.count} {item.count === 1 ? 'day' : 'days'} you were both there — probably ones you remember
+              </Body>
+            </View>
+            <Body size={14} weight="semibold" color={colors.violet}>{item.open ? 'Hide' : 'Show'}</Body>
+          </Pressable>
         ) : (
           <Post
             nm={item.nm}

@@ -172,14 +172,17 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   return (
     <Screen>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 14 }}>
+        {/* Controls get their own row, like the other two onboarding steps. Sharing a row with a
+            32pt title pushed "Next" off the edge of the screen on a narrow phone. */}
+        {onboarding && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
+            <View style={{ width: 44 }} />
+            <ProgressDots total={3} active={3} />
+            <Pill label="Done" variant="ink" height={40} onPress={() => finishOnboarding().then(() => router.replace('/'))} />
+          </View>
+        )}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
           <Display size={32}>{onboarding ? 'Find your friends' : 'Invite'}</Display>
-          {onboarding && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ProgressDots total={3} active={3} />
-              <Pill label="Next" variant="ink" height={40} onPress={() => finishOnboarding().then(() => router.replace('/'))} />
-            </View>
-          )}
         </View>
         {(hasAccess || !demo) && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder }}>

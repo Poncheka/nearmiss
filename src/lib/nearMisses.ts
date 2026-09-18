@@ -29,13 +29,27 @@ export type RealNearMiss = {
 
 export type NearMissComment = { id: string; author_id: string; body: string; created_at: string };
 
+/** A friend we found near misses with, but don't know when you two met. */
+export type NeedsMetOn = {
+  friend_id: string;
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  near_miss_count: number;
+  earliest: string;
+};
+
 type State = {
   items: RealNearMiss[];
   loaded: boolean;
   loading: boolean;
   error: string | null;
   lastRefresh: number;
+  /** Friends we should ask "when did you two meet?" about. */
+  needsMetOn: NeedsMetOn[];
   load: (opts?: { rematch?: boolean }) => Promise<void>;
+  loadNeedsMetOn: () => Promise<void>;
+  setMetOn: (friendId: string, date: string | null) => Promise<void>;
   markRead: (id: string) => void;
   reset: () => void;
 };
@@ -107,6 +121,20 @@ export const useNearMisses = create<State>((set, get) => ({
   loading: false,
   error: null,
   lastRefresh: 0,
+  needsMetOn: [],
+  loadNeedsMetOn: async () => {
+    const { data, error } = await supabase.rpc('friendships_needing_met_on');
+    if (error) return;
+    set({ needsMetOn: ((data ?? []) as NeedsMetOn[]).map((n) => ({ ...n, near_miss_count: Number(n.near_miss_count) })) });
+  },
+  setMetOn: async (friendId, date) => {
+    const { error } = await supabase.rpc('set_met_on', { friend: friendId, on_date: date });
+    if (error) throw new Error(error.message);
+    // The server relabels every near miss for the pair, so pull them again.
+    set({ needsMetOn: get().needsMetOn.filter((n) => n.friend_id !== friendId) });
+    const { data } = await supabase.rpc('my_near_misses');
+    if (data) set({ items: (data as RealNearMiss[]).map((n) => ({ ...n, comment_count: Number(n.comment_count), unread_count: Number(n.unread_count) })) });
+  },
   load: async ({ rematch = false } = {}) => {
     if (get().loading) return;
     set({ loading: true, error: null });
@@ -120,6 +148,7 @@ export const useNearMisses = create<State>((set, get) => ({
       if (error) throw new Error(error.message);
       const items = ((data ?? []) as RealNearMiss[]).map((n) => ({ ...n, comment_count: Number(n.comment_count), unread_count: Number(n.unread_count) }));
       set({ items, loaded: true });
+      get().loadNeedsMetOn();
       namePlaces(items, (id, name) => set({ items: get().items.map((x) => (x.id === id ? { ...x, place_name: name } : x)) }));
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e), loaded: true });
@@ -131,7 +160,7 @@ export const useNearMisses = create<State>((set, get) => ({
     set({ items: get().items.map((x) => (x.id === id ? { ...x, is_new: false, unread_count: 0 } : x)) });
     supabase.rpc('mark_near_miss_read', { nm_id: id }).then(() => {}, () => {});
   },
-  reset: () => set({ items: [], loaded: false, loading: false, error: null, lastRefresh: 0 }),
+  reset: () => set({ items: [], loaded: false, loading: false, error: null, lastRefresh: 0, needsMetOn: [] }),
 }));
 
 export async function loadComments(nmId: string): Promise<NearMissComment[]> {
