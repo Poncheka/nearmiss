@@ -10,6 +10,7 @@ import { resetScanCursor } from '@/lib/photoScan';
 import { usePlaces } from '@/lib/places';
 import { useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
+import { useSharedPhotos } from '@/lib/sharedPhotos';
 
 export type Profile = {
   id: string;
@@ -221,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     usePlaces.getState().reset();
     useContacts.getState().reset();
     useNearMisses.getState().reset();
+    useSharedPhotos.getState().reset();
     await supabase.auth.signOut();
   }, [demo]);
 

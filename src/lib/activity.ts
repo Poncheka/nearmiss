@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
-export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss';
+export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared';
 
 export type RealActivity = {
   id: string;
@@ -43,6 +43,7 @@ export function activityText(a: RealActivity): string {
     // Deliberately no count: matching a new friend can add dozens at once, and any number
     // we wrote here would be wrong by the time it was read.
     case 'near_miss': return 'and you have new near misses';
+    case 'photo_shared': return a.place_name ? `shared a photo from ${a.place_name.split(',')[0]}` : 'shared a photo from that day';
     default: return 'did something';
   }
 }

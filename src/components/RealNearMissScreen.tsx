@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUp, ChevronLeft, Maximize2 } from 'lucide-react-native';
+import { ArrowUp, ChevronLeft, ImagePlus, Maximize2, Play } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { addComment, formatWhen, giveFeedback, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
+import { SharedPhoto, useSharedPhotos } from '@/lib/sharedPhotos';
 import { colors, fonts, pastel, radius } from '@/theme';
 
 const FEEDBACK: { kind: 'together' | 'not_interesting'; label: string }[] = [
@@ -26,11 +27,27 @@ export function RealNearMissScreen({ id }: { id: string }) {
   useEffect(() => {
     if (!loaded) useNearMisses.getState().load();
   }, [loaded]);
+  const photos = useSharedPhotos((s) => (nm ? s.byNearMiss[nm.id] : undefined));
+  const sharing = useSharedPhotos((s) => (nm ? !!s.busy[nm.id] : false));
+
   useEffect(() => {
     if (!nm) return;
     useNearMisses.getState().markRead(nm.id);
     loadComments(nm.id).then(setComments).catch(() => setComments([]));
+    useSharedPhotos.getState().load(nm.id);
   }, [nm?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  type Entry =
+    | { kind: 'comment'; key: string; at: string; comment: NearMissComment }
+    | { kind: 'photo'; key: string; at: string; photo: SharedPhoto };
+
+  const thread = useMemo<Entry[]>(() => {
+    const out: Entry[] = [
+      ...(comments ?? []).map((c): Entry => ({ kind: 'comment', key: `c${c.id}`, at: c.created_at, comment: c })),
+      ...(photos ?? []).map((p): Entry => ({ kind: 'photo', key: `p${p.id}`, at: p.created_at, photo: p })),
+    ];
+    return out.sort((a, b) => a.at.localeCompare(b.at));
+  }, [comments, photos]);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -63,6 +80,26 @@ export function RealNearMissScreen({ id }: { id: string }) {
       setSending(false);
     }
   };
+
+  const sharePhoto = async () => {
+    if (!nm) return;
+    try {
+      await useSharedPhotos.getState().share(nm.id);
+    } catch (e) {
+      Alert.alert("Couldn't share that", e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const unshare = (photo: SharedPhoto) => Alert.alert('Remove this?', `${name} won't be able to see it any more.`, [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Remove', style: 'destructive', onPress: async () => {
+        if (!nm) return;
+        try { await useSharedPhotos.getState().remove(nm.id, photo); }
+        catch (e) { Alert.alert("Couldn't remove it", e instanceof Error ? e.message : String(e)); }
+      },
+    },
+  ]);
 
   const feedback = (kind: 'together' | 'not_interesting', label: string) => Alert.alert(label, 'This near miss will be hidden from your feed.', [
     { text: 'Cancel', style: 'cancel' },
@@ -138,21 +175,46 @@ export function RealNearMissScreen({ id }: { id: string }) {
             </View>
           </Card>
 
+          {/* Photos and words in one thread, in the order they happened. */}
           <View style={{ gap: 10 }}>
             <Body size={17} weight="bold" style={{ paddingHorizontal: 4 }}>
-              {comments && comments.length ? 'Comments' : `Ask ${name} about that day`}
+              {thread.length ? 'That day' : `Ask ${name} about that day`}
             </Body>
-            {comments === null ? <ActivityIndicator color={colors.violet} /> : comments.map((c) => {
-              const mine = c.author_id === me;
+            {comments === null ? <ActivityIndicator color={colors.violet} /> : thread.map((entry) => {
+              const mine = entry.kind === 'comment' ? entry.comment.author_id === me : entry.photo.mine;
+              const at = entry.kind === 'comment' ? entry.comment.created_at : entry.photo.created_at;
+              const stamp = new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
               return (
-                <View key={c.id} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                <View key={entry.key} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
                   {!mine && otherAvatar(32)}
-                  <View style={{ maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, backgroundColor: mine ? colors.violet : colors.white, borderWidth: mine ? 0 : 1, borderColor: colors.cardBorder }}>
-                    <Body size={15} color={mine ? colors.white : colors.ink}>{c.body}</Body>
-                    <Body size={11} color={mine ? 'rgba(255,255,255,0.7)' : colors.faint}>
-                      {new Date(c.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                    </Body>
-                  </View>
+                  {entry.kind === 'comment' ? (
+                    <View style={{ maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, backgroundColor: mine ? colors.violet : colors.white, borderWidth: mine ? 0 : 1, borderColor: colors.cardBorder }}>
+                      <Body size={15} color={mine ? colors.white : colors.ink}>{entry.comment.body}</Body>
+                      <Body size={11} color={mine ? 'rgba(255,255,255,0.7)' : colors.faint}>{stamp}</Body>
+                    </View>
+                  ) : (
+                    <Pressable
+                      onLongPress={() => entry.photo.mine && unshare(entry.photo)}
+                      onPress={() => entry.photo.isVideo && entry.photo.url && Linking.openURL(entry.photo.url)}
+                      style={{ maxWidth: '78%', borderRadius: 18, overflow: 'hidden', backgroundColor: colors.sand, borderWidth: 1, borderColor: colors.cardBorder }}
+                    >
+                      {entry.photo.url ? (
+                        <Image source={{ uri: entry.photo.url }} style={{ width: 220, height: 220 }} resizeMode="cover" />
+                      ) : (
+                        <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.violet} /></View>
+                      )}
+                      {entry.photo.isVideo && (
+                        <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
+                          <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                            <Play size={24} color={colors.white} fill={colors.white} />
+                          </View>
+                        </View>
+                      )}
+                      <Body size={11} color={colors.faint} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+                        {entry.photo.mine ? `You · ${stamp}` : `${name} · ${stamp}`}
+                      </Body>
+                    </Pressable>
+                  )}
                 </View>
               );
             })}
@@ -164,6 +226,14 @@ export function RealNearMissScreen({ id }: { id: string }) {
         </ScrollView>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.inputBorder, backgroundColor: colors.white }}>
+          <Pressable
+            accessibilityLabel="Share a photo from that day"
+            onPress={sharePhoto}
+            disabled={sharing}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.inputBorder, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {sharing ? <ActivityIndicator color={colors.violet} /> : <ImagePlus size={20} color={colors.ink} strokeWidth={2} />}
+          </Pressable>
           <TextInput
             value={draft}
             onChangeText={setDraft}
