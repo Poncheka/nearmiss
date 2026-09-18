@@ -128,10 +128,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, [loadUser]);
 
-  // Sign-in links from email open the app with the session tokens in the URL fragment.
+  // Sign-in links from email open the app here.
+  //
+  // supabase-js defaults to the PKCE flow, which sends you back with `?code=` in the query
+  // string and expects that code to be traded for a session. We only read the `#` fragment,
+  // which is the older implicit flow, so the link opened the app and then silently did
+  // nothing. Handle the code first, and keep the fragment path for any link already in flight.
   useEffect(() => {
     const handle = async (url: string | null) => {
-      if (!url || !url.includes('#')) return;
+      if (!url) return;
+
+      const { queryParams } = Linking.parse(url);
+      const qErr = typeof queryParams?.error_description === 'string' ? queryParams.error_description : null;
+      if (qErr) { setLinkError(qErr.replace(/\+/g, ' ')); return; }
+
+      const code = typeof queryParams?.code === 'string' ? queryParams.code : null;
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        setLinkError(error ? error.message : '');
+        return;
+      }
+
+      if (!url.includes('#')) return;
       const params = new URLSearchParams(url.split('#')[1]);
       const error = params.get('error_description');
       if (error) { setLinkError(error.replace(/\+/g, ' ')); return; }

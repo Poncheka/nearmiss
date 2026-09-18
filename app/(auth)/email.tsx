@@ -24,7 +24,10 @@ export default function EmailSignIn() {
       setStep('sent');
       setResent(again);
     } catch (e) {
-      setError(errorMessage(e));
+      // Leaving the app mid-request (to go and read the email) cancels the fetch. That is
+      // not a failure worth showing anyone in red.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/cancell?ed|aborted/i.test(msg)) setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
