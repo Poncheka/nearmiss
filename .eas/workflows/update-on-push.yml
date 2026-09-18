@@ -1,16 +1,42 @@
 name: Send update to test builds
 
-# Every push to main sends an over-the-air update to installed test builds
-# (builds made with the "preview" profile listen on the "preview" channel).
+# Every push to main sends an over-the-air update to the builds that actually exist.
+#
+# A build only listens to the channel its build profile set, so an update has to name
+# that channel or it reaches nobody. The channels in use:
+#
+#   development  the dev build on Jeff's phone      (profile: development)
+#   production   the TestFlight build, and testers  (profile: production)
+#
+# "preview" is not here on purpose: no preview build has ever been made, so updating
+# that channel was publishing into the void. Add a job back if one gets built.
+#
+# Only JavaScript and assets travel this way. Anything native — a new package, an
+# Info.plist key, an icon — still needs a real build, and a build whose runtimeVersion
+# differs (it follows the app version, currently 1.0.0) ignores these updates entirely.
+#
+# NOTE: this pushes to the production channel on every merge to main, which is what
+# makes TestFlight testers pick up fixes in seconds instead of a 25 minute rebuild.
+# That is the right trade while the testers are people who know us. Before real App
+# Store users exist, delete the update_production job below and publish that channel
+# from a tag instead, the way release-testflight.yml already does.
 on:
   push:
     branches: ['main']
 
 jobs:
-  publish_update:
-    name: Publish over-the-air update
+  update_development:
+    name: Update the dev build
     type: update
-    environment: preview
+    environment: development
     params:
-      channel: preview
+      channel: development
+      platform: all
+
+  update_production:
+    name: Update TestFlight
+    type: update
+    environment: production
+    params:
+      channel: production
       platform: all
