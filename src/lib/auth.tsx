@@ -6,6 +6,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useScan } from '@/state/scan';
+import { resetScanCursor } from '@/lib/photoScan';
 import { usePlaces } from '@/lib/places';
 import { useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
@@ -57,6 +58,8 @@ type AuthState = {
   verifyEmailCode: (email: string, code: string) => Promise<void>;
   startDemo: () => void;
   signOut: () => Promise<void>;
+  /** Permanently removes the account and everything stored with it. */
+  deleteAccount: () => Promise<void>;
   saveProfile: (p: { username: string; name: string; bio: string }) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   finishOnboarding: () => Promise<void>;
@@ -221,6 +224,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, [demo]);
 
+  const deleteAccount = useCallback(async () => {
+    if (demo || !session) { await signOut(); return; }
+    const uid = session.user.id;
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) throw new UserFacingError(`Couldn't delete your account: ${error.message}`);
+    // The account is gone, so forget where the last scan got to on this phone too.
+    await resetScanCursor(uid);
+    await signOut().catch(() => {});
+    setSession(null);
+    setProfile(null);
+    setSettings(defaultSettings);
+    setUserLoaded(false);
+  }, [demo, session, signOut]);
+
   const saveProfile = useCallback(async ({ username, name, bio }: { username: string; name: string; bio: string }) => {
     const clean = username.trim().replace(/^@/, '').toLowerCase();
     if (!/^[a-z0-9_.]{3,24}$/.test(clean)) {
@@ -283,11 +300,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifyEmailCode,
     startDemo,
     signOut,
+    deleteAccount,
     saveProfile,
     updateSettings,
     finishOnboarding,
     uploadAvatar,
-  }), [loading, userLoaded, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, saveProfile, updateSettings, finishOnboarding, uploadAvatar]);
+  }), [loading, userLoaded, demo, session, profile, settings, signInWithApple, signInWithGoogle, sendEmailCode, linkError, verifyEmailCode, startDemo, signOut, deleteAccount, saveProfile, updateSettings, finishOnboarding, uploadAvatar]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

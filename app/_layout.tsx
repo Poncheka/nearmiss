@@ -52,8 +52,10 @@ function RootNavigator() {
         <Stack.Screen name="near-miss/[id]" />
         <Stack.Screen name="friend/[id]" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
-        {/* Hidden places: opened from the You tab only */}
+        {/* Opened from the You tab only */}
         <Stack.Screen name="places" />
+        <Stack.Screen name="location" />
+        <Stack.Screen name="delete-account" />
       </Stack.Protected>
 
       {/* Email sign-in links open here, signed in or not. Keep this last: when a screen is

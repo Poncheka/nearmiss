@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import * as Location from 'expo-location';
 import { ChevronRight } from 'lucide-react-native';
 import { Body, Card, Display, Divider, Segmented, Screen, SectionLabel, TextLink, Toggle } from '@/components/ui';
 import { AvatarPicker } from '@/components/AvatarPicker';
@@ -171,6 +172,38 @@ function HiddenPlaces({ demo }: { demo: boolean }) {
   );
 }
 
+function LocationRow() {
+  const [state, setState] = useState<string | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    if (Platform.OS === 'web') { setState('Not available here'); return; }
+    Location.getForegroundPermissionsAsync()
+      .then((p) => setState(p.granted ? 'On while you use the app' : p.status === 'undetermined' ? 'Not asked yet' : 'Off'))
+      .catch(() => setState('Off'));
+  }, []));
+
+  return (
+    <Pressable onPress={() => router.push('/location')}>
+      <Group>
+        <Row last minHeight={56}>
+          <Label title="Location" sub={state ?? 'Checking…'} />
+          <ChevronRight size={16} color={colors.faint} />
+        </Row>
+      </Group>
+    </Pressable>
+  );
+}
+
+// Until there's a self-serve export, this is the honest version of the promise in the privacy policy.
+const requestExport = () => Alert.alert(
+  'Download my data',
+  'Email hello@nearmiss.io from the address on your account and we will send you everything we have stored, usually within a few days.',
+  [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Write the email', onPress: () => Linking.openURL('mailto:hello@nearmiss.io?subject=Data%20request') },
+  ],
+);
+
 export default function You() {
   const { profile, settings, updateSettings, signOut, demo } = useAuth();
   const save = (patch: Partial<Settings>) => updateSettings(patch).catch(() => Alert.alert("Couldn't save", 'Check your connection and try again.'));
@@ -234,17 +267,21 @@ export default function You() {
           Photos taken inside these are never saved or matched.
         </Body>
 
+        <SectionLabel>Location</SectionLabel>
+        <LocationRow />
+
         <SectionLabel>Your data</SectionLabel>
         <PhotoData demo={demo} />
 
         <View style={{ height: 20 }} />
         <Group>
           <Row>
-            <TextLink label="Download my data" color={colors.ink} />
+            <TextLink label="Download my data" color={colors.ink} onPress={requestExport} />
             <ChevronRight size={16} color={colors.faint} />
           </Row>
+          <Row><TextLink label="Privacy policy" color={colors.ink} onPress={() => Linking.openURL('https://nearmiss.io/privacy')} /></Row>
           <Row><TextLink label={demo ? 'Leave sample data' : 'Sign out'} color={colors.ink} onPress={confirmSignOut} /></Row>
-          <Row last><TextLink label="Delete my account" color={colors.danger} /></Row>
+          <Row last><TextLink label="Delete my account" color={colors.danger} onPress={() => router.push('/delete-account')} /></Row>
         </Group>
       </ScrollView>
     </Screen>

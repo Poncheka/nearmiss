@@ -47,7 +47,7 @@ export function Body({ children, size = 16, color = colors.ink, weight = 'regula
 
 // ---------- Buttons ----------
 
-type BtnVariant = 'violet' | 'ink' | 'white' | 'text' | 'tint' | 'sand';
+type BtnVariant = 'violet' | 'ink' | 'white' | 'text' | 'tint' | 'sand' | 'danger';
 
 const btnColors: Record<BtnVariant, { bg: string; fg: string; border?: string }> = {
   violet: { bg: colors.violet, fg: colors.white },
@@ -56,6 +56,7 @@ const btnColors: Record<BtnVariant, { bg: string; fg: string; border?: string }>
   text: { bg: 'transparent', fg: colors.text2 },
   tint: { bg: colors.violetTint, fg: colors.violet },
   sand: { bg: colors.sand, fg: colors.muted },
+  danger: { bg: colors.danger, fg: colors.white },
 };
 
 export function Button({ label, onPress, variant = 'violet', style, disabled }: {
