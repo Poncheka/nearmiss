@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUp, ChevronLeft, ImagePlus, Maximize2 } from 'lucide-react-native';
+import { ArrowUp, ChevronLeft, ImagePlus } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
-import { PairMap } from '@/components/map/PairMap';
-import { SharedVideo } from '@/components/SharedVideo';
+import { NearMissGallery } from '@/components/NearMissGallery';
 import { ShareFromThatNight } from '@/components/ShareFromThatNight';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -39,18 +38,6 @@ export function RealNearMissScreen({ id }: { id: string }) {
     loadComments(nm.id).then(setComments).catch(() => setComments([]));
     useSharedPhotos.getState().load(nm.id);
   }, [nm?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  type Entry =
-    | { kind: 'comment'; key: string; at: string; comment: NearMissComment }
-    | { kind: 'photo'; key: string; at: string; photo: SharedPhoto };
-
-  const thread = useMemo<Entry[]>(() => {
-    const out: Entry[] = [
-      ...(comments ?? []).map((c): Entry => ({ kind: 'comment', key: `c${c.id}`, at: c.created_at, comment: c })),
-      ...(photos ?? []).map((p): Entry => ({ kind: 'photo', key: `p${p.id}`, at: p.created_at, photo: p })),
-    ];
-    return out.sort((a, b) => a.at.localeCompare(b.at));
-  }, [comments, photos]);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -90,8 +77,8 @@ export function RealNearMissScreen({ id }: { id: string }) {
     }
   };
 
-  // Opens that day's own photos rather than the whole library — which also means no second
-  // photo permission prompt, since it reads the access granted at sign-up.
+  // That day's photos, never the whole library. Also why there is no second permission prompt:
+  // this reads the access granted at sign-up rather than opening the system picker.
   const sharePhoto = () => {
     if (!nm) return;
     router.push({ pathname: '/that-day/[id]', params: { id: nm.id } });
@@ -163,68 +150,31 @@ export function RealNearMissScreen({ id }: { id: string }) {
             ) : null}
           </View>
 
-          {/* Tapping opens it full screen. Pinching here would fight the page's own scrolling. */}
-          <Card style={{ overflow: 'hidden' }}>
-            <Pressable onPress={() => router.push({ pathname: '/map/[id]', params: { id: nm.id } })}>
-              <PairMap
-                me={{ latitude: nm.my_lat, longitude: nm.my_lng }}
-                them={{ latitude: nm.their_lat, longitude: nm.their_lng }}
-                height={240}
-                width={width - 42}
-              />
-              <View style={{ position: 'absolute', right: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34, borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder }}>
-                <Maximize2 size={14} color={colors.ink} strokeWidth={2.2} />
-                <Body size={13} weight="semibold">Open map</Body>
-              </View>
-            </Pressable>
-            <View style={{ flexDirection: 'row', gap: 14, paddingHorizontal: 14, paddingVertical: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.violet }} />
-                <Body size={13} color={colors.text2}>You</Body>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.coral }} />
-                <Body size={13} color={colors.text2}>{name}</Body>
-              </View>
-            </View>
-          </Card>
+          {/* Map first, then whatever has been shared from that day. */}
+          <NearMissGallery
+            nm={nm}
+            width={width - 42}
+            photos={photos ?? []}
+            name={name}
+            onUnshare={unshare}
+          />
 
-          {/* Photos and words in one thread, in the order they happened. */}
+          {/* Just the conversation now. The photos moved up into the gallery, where they are the
+              first thing you see rather than an attachment halfway down a thread. */}
           <View style={{ gap: 10 }}>
             <Body size={17} weight="bold" style={{ paddingHorizontal: 4 }}>
-              {thread.length ? 'That day' : `Ask ${name} about that day`}
+              {(comments ?? []).length ? 'That day' : `Ask ${name} about that day`}
             </Body>
-            {comments === null ? <ActivityIndicator color={colors.violet} /> : thread.map((entry) => {
-              const mine = entry.kind === 'comment' ? entry.comment.author_id === me : entry.photo.mine;
-              const at = entry.kind === 'comment' ? entry.comment.created_at : entry.photo.created_at;
-              const stamp = new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+            {comments === null ? <ActivityIndicator color={colors.violet} /> : comments.map((c) => {
+              const mine = c.author_id === me;
+              const stamp = new Date(c.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
               return (
-                <View key={entry.key} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                <View key={c.id} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
                   {!mine && otherAvatar(32)}
-                  {entry.kind === 'comment' ? (
-                    <View style={{ maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, backgroundColor: mine ? colors.violet : colors.white, borderWidth: mine ? 0 : 1, borderColor: colors.cardBorder }}>
-                      <Body size={15} color={mine ? colors.white : colors.ink}>{entry.comment.body}</Body>
-                      <Body size={11} color={mine ? 'rgba(255,255,255,0.7)' : colors.faint}>{stamp}</Body>
-                    </View>
-                  ) : (
-                    <Pressable
-                      onLongPress={() => entry.photo.mine && unshare(entry.photo)}
-                      style={{ maxWidth: '78%', borderRadius: 18, overflow: 'hidden', backgroundColor: colors.sand, borderWidth: 1, borderColor: colors.cardBorder }}
-                    >
-                      {!entry.photo.url ? (
-                        <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.violet} /></View>
-                      ) : entry.photo.isVideo ? (
-                        // Plays in place. Long-pressing the tile to unshare still works: the play
-                        // overlay only covers the video until it starts.
-                        <SharedVideo uri={entry.photo.url} size={220} />
-                      ) : (
-                        <Image source={{ uri: entry.photo.url }} style={{ width: 220, height: 220 }} resizeMode="cover" />
-                      )}
-                      <Body size={11} color={colors.faint} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-                        {entry.photo.mine ? `You · ${stamp}` : `${name} · ${stamp}`}
-                      </Body>
-                    </Pressable>
-                  )}
+                  <View style={{ maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, backgroundColor: mine ? colors.violet : colors.white, borderWidth: mine ? 0 : 1, borderColor: colors.cardBorder }}>
+                    <Body size={15} color={mine ? colors.white : colors.ink}>{c.body}</Body>
+                    <Body size={11} color={mine ? 'rgba(255,255,255,0.7)' : colors.faint}>{stamp}</Body>
+                  </View>
                 </View>
               );
             })}

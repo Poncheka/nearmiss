@@ -8,14 +8,27 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { Play } from 'lucide-react-native';
 import { colors } from '@/theme';
 
-export function SharedVideo({ uri, size = 220 }: { uri: string; size?: number }) {
+export function SharedVideo({
+  uri,
+  size = 220,
+  width,
+  height,
+}: {
+  uri: string;
+  /** Shorthand for a square. Ignored when width and height are given. */
+  size?: number;
+  width?: number;
+  height?: number;
+}) {
   const [started, setStarted] = useState(false);
   const player = useVideoPlayer(uri, (p) => { p.loop = false; });
+  const w = width ?? size;
+  const h = height ?? size;
 
   return (
-    <View style={{ width: size, height: size, backgroundColor: colors.ink }}>
+    <View style={{ width: w, height: h, backgroundColor: colors.ink }}>
       <VideoView
-        style={{ width: size, height: size }}
+        style={{ width: w, height: h }}
         player={player}
         contentFit="cover"
         nativeControls={started}

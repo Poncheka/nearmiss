@@ -1,5 +1,10 @@
 // Sharing a photo or clip from the day you nearly met.
 //
+// Only from that day. There is no path to the whole camera roll, on purpose: a near miss is a
+// specific moment in a specific place, and a photo from some other week is not a reply to it.
+// Keeping the source narrow is also what keeps the second permission prompt away, since reading
+// the library we were already given needs nothing new.
+//
 // This is the one place a photo leaves the phone, and it only happens because someone picked
 // that photo and tapped share. The file goes to a private bucket under
 // <near_miss_id>/<owner_id>/<file>; database policies only let the two people in that near
@@ -35,10 +40,8 @@ type State = {
   byNearMiss: Record<string, SharedPhoto[]>;
   busy: Record<string, boolean>;
   load: (nearMissId: string) => Promise<void>;
-  /** Shares files the person picked from that day. */
+  /** Shares files the person picked from that day. Nothing else can be shared here. */
   share: (nearMissId: string, shots: Shareable[]) => Promise<void>;
-  /** The fallback: the system picker over the whole library, with its own permission prompt. */
-  shareFromLibrary: (nearMissId: string) => Promise<void>;
   remove: (nearMissId: string, photo: SharedPhoto) => Promise<void>;
   reset: () => void;
 };
@@ -118,34 +121,6 @@ export const useSharedPhotos = create<State>((set, get) => ({
     } finally {
       set({ busy: { ...get().busy, [nearMissId]: false } });
     }
-  },
-
-  shareFromLibrary: async (nearMissId) => {
-    if (Platform.OS === 'web') throw new Error('Sharing a photo works in the Near Miss app on your phone.');
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Picker = require('expo-image-picker') as typeof import('expo-image-picker');
-
-    // No permission request here, deliberately.
-    //
-    // The system picker runs outside the app and hands back only what the person chose, so iOS
-    // grants it nothing and asks for nothing. Requesting library access first was asking for a
-    // permission this screen does not use, which is how someone who had already said yes at
-    // sign-up got asked a second time. AvatarPicker has always launched it this way.
-    const picked = await Picker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
-      quality: 0.8,
-      videoMaxDuration: 30,
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-    });
-    if (picked.canceled || !picked.assets?.length) return;
-
-    await get().share(nearMissId, picked.assets.map((a) => ({
-      uri: a.uri,
-      isVideo: a.type === 'video',
-      filename: a.fileName,
-    })));
   },
 
   remove: async (nearMissId, photo) => {

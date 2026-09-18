@@ -1,13 +1,14 @@
 // Pick from the photos you took at the near miss.
 //
-// Not a picker over your whole library: the near miss already tells us when and where, so these
-// are the photos from that window and that spot. The full picker is still one tap away for the
-// times the phone has nothing — an old photo with location off, or a day you didn't shoot.
+// Only those. The near miss already says when and where, so a photo from some other week is not
+// a reply to it, and there is deliberately no way to reach the rest of the camera roll from
+// here. That also keeps the second permission prompt away: reading the library we were already
+// given needs nothing new, while the system picker carries its own.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronLeft, Images, Play } from 'lucide-react-native';
-import { Body, Button, Display, IconButton, Screen, TextLink } from '@/components/ui';
+import { Body, Button, Display, IconButton, Screen } from '@/components/ui';
 import { formatWhen, placeLabel, useNearMisses } from '@/lib/nearMisses';
 import { LocalShot, shotsFromThatDay } from '@/lib/thatDay';
 import { useSharedPhotos } from '@/lib/sharedPhotos';
@@ -60,16 +61,6 @@ export default function ThatDayPicker() {
     }
   };
 
-  const fromLibrary = async () => {
-    if (!id) return;
-    try {
-      await useSharedPhotos.getState().shareFromLibrary(id);
-      back();
-    } catch (e) {
-      Alert.alert("Couldn't share that", e instanceof Error ? e.message : String(e));
-    }
-  };
-
   if (!nm) {
     return (
       <Screen edges={['top', 'bottom']}>
@@ -109,9 +100,8 @@ export default function ThatDayPicker() {
             <Images size={28} color={colors.faint} strokeWidth={1.6} />
             <Body size={16} color={colors.muted} style={{ textAlign: 'center' }}>
               No photos on this phone from that time and place. They may have been taken with location
-              off, or already deleted.
+              switched off in the camera, or deleted since.
             </Body>
-            <Button label="Choose from all photos" variant="white" onPress={fromLibrary} />
           </View>
         ) : (
           <>
@@ -149,9 +139,6 @@ export default function ThatDayPicker() {
               })}
             </View>
 
-            <View style={{ alignItems: 'center', paddingTop: 4 }}>
-              <TextLink label="Choose from all photos instead" onPress={fromLibrary} />
-            </View>
           </>
         )}
       </ScrollView>
