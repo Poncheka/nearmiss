@@ -14,6 +14,8 @@ export type RealNearMiss = {
   via_id: string | null;
   via_name: string | null;
   closest_at: string;
+  /** When we found it, as opposed to when it happened. The "recently found" order reads this. */
+  found_at: string | null;
   night: string;
   distance_m: number;
   place_name: string | null;

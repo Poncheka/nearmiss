@@ -24,7 +24,8 @@ type Row =
   | { kind: 'real'; nm: RealNearMiss }
   | { kind: 'ask'; friend: NeedsMetOn }
   | { kind: 'since'; count: number; open: boolean }
-  | { kind: 'push' };
+  | { kind: 'push' }
+  | { kind: 'found'; label: string };
 
 const PASTELS = [pastel.lilac, pastel.peach, pastel.sage, pastel.butter, pastel.sky];
 const colorFor = (key: string) => PASTELS[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % PASTELS.length];
@@ -220,6 +221,59 @@ const Post = memo(function Post({ nm, width, tags, unread, commentCount }: {
   );
 });
 
+/**
+ * Two ways to read the same near misses.
+ *
+ * Timeline is the default and the point of the app: oldest first, so it reads as a history of
+ * two lives brushing past each other. But when a friend joins, twenty years of near misses
+ * arrive at once and land scattered through that history, which is no way to find out what just
+ * turned up. Recently found answers that instead, newest discovery first.
+ */
+type Sort = 'timeline' | 'found';
+
+function SortTabs({ value, onChange }: { value: Sort; onChange: (v: Sort) => void }) {
+  const tabs: { id: Sort; label: string }[] = [
+    { id: 'timeline', label: 'Timeline' },
+    { id: 'found', label: 'Recently found' },
+  ];
+  return (
+    <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: PAD, paddingBottom: 10 }}>
+      {tabs.map((t) => {
+        const on = value === t.id;
+        return (
+          <Pressable
+            key={t.id}
+            onPress={() => onChange(t.id)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            style={{
+              minHeight: 38, paddingHorizontal: 16, borderRadius: radius.pill,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: on ? colors.ink : colors.white,
+              borderWidth: 1, borderColor: on ? colors.ink : colors.inputBorder,
+            }}
+          >
+            <Body size={14} weight="semibold" color={on ? colors.white : colors.text2}>{t.label}</Body>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** "Today", "Yesterday", then the date. Headings for the recently found list. */
+function foundLabel(iso: string) {
+  const d = new Date(iso);
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const days = Math.round((today - day) / 86400000);
+  if (days <= 0) return 'Found today';
+  if (days === 1) return 'Found yesterday';
+  if (days < 7) return `Found ${days} days ago`;
+  return `Found ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' })}`;
+}
+
 export default function Feed() {
   const { width } = useWindowDimensions();
   const { demo, profile } = useAuth();
@@ -248,11 +302,31 @@ export default function Feed() {
   const activityRead = useStore((s) => s.activityRead);
   const cardWidth = Math.min(width, 640) - PAD * 2 - 2;
   const [showSince, setShowSince] = useState(false);
+  const [sort, setSort] = useState<Sort>('timeline');
 
   // Oldest first, with a year label whenever the year changes.
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     let year = 0;
+    if (!demo && sort === 'found') {
+      // Same near misses, same rules about what belongs in the feed. Only the order changes:
+      // newest discovery first, grouped by the day it turned up.
+      const unknown = new Set(real.needsMetOn.map((n) => n.friend_id));
+      const feed = real.items
+        .filter((n) => n.is_before_met || unknown.has(n.other_id))
+        .slice()
+        .sort((a, b) => (b.found_at ?? '').localeCompare(a.found_at ?? ''));
+
+      let heading = '';
+      for (const nm of feed) {
+        const label = nm.found_at ? foundLabel(nm.found_at) : 'Found earlier';
+        if (label !== heading) { heading = label; out.push({ kind: 'found', label }); }
+        out.push({ kind: 'real', nm });
+      }
+      const first = out.findIndex((r) => r.kind === 'real');
+      if (first !== -1) out.splice(first + 1, 0, { kind: 'push' });
+      return out;
+    }
     if (!demo) {
       // A near miss from after you met is usually a day you already remember — the trip you
       // took together, not a time you almost crossed paths. Keep those out of the main feed.
@@ -298,7 +372,7 @@ export default function Feed() {
       out.push({ kind: 'post', nm });
     }
     return out;
-  }, [demo, real.items, real.needsMetOn, showSince]);
+  }, [demo, real.items, real.needsMetOn, showSince, sort]);
 
   const tagsFor = (nm: NearMiss) => {
     const t: { label: string; tone: ChipTone }[] = [];
@@ -359,6 +433,8 @@ export default function Feed() {
         </View>
       </View>
 
+      {!demo && real.items.length > 1 ? <SortTabs value={sort} onChange={setSort} /> : null}
+
       <FlatList
         data={rows}
         keyExtractor={(r) =>
@@ -366,6 +442,7 @@ export default function Feed() {
           : r.kind === 'ask' ? `ask${r.friend.friend_id}`
           : r.kind === 'since' ? 'since'
           : r.kind === 'push' ? 'push'
+          : r.kind === 'found' ? `f${r.label}`
           : r.nm.id}
         initialNumToRender={4}
         windowSize={5}
@@ -390,6 +467,8 @@ export default function Feed() {
           <RealPost nm={item.nm} width={cardWidth} myBirthday={profile?.birthday} />
         ) : item.kind === 'year' ? (
           <Text style={{ fontFamily: fonts.display, fontSize: 20, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.year}</Text>
+        ) : item.kind === 'found' ? (
+          <Text style={{ fontFamily: fonts.display, fontSize: 18, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.label}</Text>
         ) : item.kind === 'push' ? (
           <PushOffer />
         ) : item.kind === 'ask' ? (
