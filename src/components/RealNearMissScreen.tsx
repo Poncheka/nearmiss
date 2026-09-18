@@ -82,13 +82,11 @@ export function RealNearMissScreen({ id }: { id: string }) {
     }
   };
 
-  const sharePhoto = async () => {
+  // Opens that day's own photos rather than the whole library — which also means no second
+  // photo permission prompt, since it reads the access granted at sign-up.
+  const sharePhoto = () => {
     if (!nm) return;
-    try {
-      await useSharedPhotos.getState().share(nm.id);
-    } catch (e) {
-      Alert.alert("Couldn't share that", e instanceof Error ? e.message : String(e));
-    }
+    router.push({ pathname: '/that-day/[id]', params: { id: nm.id } });
   };
 
   const unshare = (photo: SharedPhoto) => Alert.alert('Remove this?', `${name} won't be able to see it any more.`, [

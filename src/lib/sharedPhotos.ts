@@ -28,14 +28,28 @@ export type SharedPhoto = {
 
 const looksLikeVideo = (path: string) => /\.(mp4|mov|m4v|qt)$/i.test(path);
 
+/** A file on this phone, ready to go: from that day's photos, or from the full picker. */
+export type Shareable = { uri: string; isVideo: boolean; filename?: string | null };
+
 type State = {
   byNearMiss: Record<string, SharedPhoto[]>;
   busy: Record<string, boolean>;
   load: (nearMissId: string) => Promise<void>;
-  share: (nearMissId: string) => Promise<void>;
+  /** Shares files the person picked from that day. */
+  share: (nearMissId: string, shots: Shareable[]) => Promise<void>;
+  /** The fallback: the system picker over the whole library, with its own permission prompt. */
+  shareFromLibrary: (nearMissId: string) => Promise<void>;
   remove: (nearMissId: string, photo: SharedPhoto) => Promise<void>;
   reset: () => void;
 };
+
+const extOf = (f: Shareable) =>
+  (f.filename?.split('.').pop() || f.uri.split('?')[0].split('.').pop() || (f.isVideo ? 'mp4' : 'jpg')).toLowerCase();
+
+const typeOf = (ext: string, isVideo: boolean) =>
+  isVideo
+    ? (ext === 'mov' || ext === 'qt' ? 'video/quicktime' : 'video/mp4')
+    : ext === 'png' ? 'image/png' : ext === 'heic' ? 'image/heic' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
 async function sign(rows: SharedPhoto[]): Promise<SharedPhoto[]> {
   if (!rows.length) return rows;
@@ -56,9 +70,58 @@ export const useSharedPhotos = create<State>((set, get) => ({
     set({ byNearMiss: { ...get().byNearMiss, [nearMissId]: rows } });
   },
 
-  share: async (nearMissId) => {
+  share: async (nearMissId, shots) => {
     if (Platform.OS === 'web') throw new Error('Sharing a photo works in the Near Miss app on your phone.');
-    if (get().busy[nearMissId]) return;
+    if (!shots.length || get().busy[nearMissId]) return;
+
+    set({ busy: { ...get().busy, [nearMissId]: true } });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Sign in to share a photo.');
+
+      let sent = 0;
+      let firstError: string | null = null;
+
+      for (const shot of shots) {
+        try {
+          const body = await (await fetch(shot.uri)).arrayBuffer();
+          if (body.byteLength > MAX_BYTES) {
+            throw new Error(shot.isVideo ? 'That clip is too big. Try a shorter one.' : 'That photo is too big.');
+          }
+
+          const ext = extOf(shot);
+          // The path is what the security policies read: near miss, then owner.
+          const path = `${nearMissId}/${user.id}/${Date.now()}-${sent}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from(BUCKET)
+            .upload(path, body, { contentType: typeOf(ext, shot.isVideo), upsert: false });
+          if (upErr) throw new Error(`Couldn't upload that: ${upErr.message}`);
+
+          const { error: rowErr } = await supabase
+            .from('shared_photos')
+            .insert({ near_miss_id: nearMissId, owner_id: user.id, storage_path: path });
+          if (rowErr) {
+            // Don't leave an orphan file behind if the row is refused.
+            await supabase.storage.from(BUCKET).remove([path]).catch(() => {});
+            throw new Error(rowErr.message);
+          }
+          sent += 1;
+        } catch (e) {
+          // One bad file shouldn't lose the rest of the selection.
+          if (!firstError) firstError = e instanceof Error ? e.message : String(e);
+        }
+      }
+
+      await get().load(nearMissId);
+      if (!sent && firstError) throw new Error(firstError);
+      if (firstError) throw new Error(`Shared ${sent} of ${shots.length}. ${firstError}`);
+    } finally {
+      set({ busy: { ...get().busy, [nearMissId]: false } });
+    }
+  },
+
+  shareFromLibrary: async (nearMissId) => {
+    if (Platform.OS === 'web') throw new Error('Sharing a photo works in the Near Miss app on your phone.');
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Picker = require('expo-image-picker') as typeof import('expo-image-picker');
@@ -69,47 +132,16 @@ export const useSharedPhotos = create<State>((set, get) => ({
       mediaTypes: ['images', 'videos'],
       quality: 0.8,
       videoMaxDuration: 30,
-      allowsMultipleSelection: false,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
     });
     if (picked.canceled || !picked.assets?.length) return;
-    const asset = picked.assets[0];
 
-    set({ busy: { ...get().busy, [nearMissId]: true } });
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sign in to share a photo.');
-
-      const body = await (await fetch(asset.uri)).arrayBuffer();
-      if (body.byteLength > MAX_BYTES) {
-        throw new Error(asset.type === 'video'
-          ? 'That clip is too big. Try a shorter one.'
-          : 'That photo is too big.');
-      }
-
-      const isVideo = asset.type === 'video';
-      const ext = (asset.fileName?.split('.').pop() || (isVideo ? 'mp4' : 'jpg')).toLowerCase();
-      const contentType = isVideo
-        ? (ext === 'mov' || ext === 'qt' ? 'video/quicktime' : 'video/mp4')
-        : ext === 'png' ? 'image/png' : ext === 'heic' ? 'image/heic' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-
-      // The path is what the security policies read: near miss, then owner.
-      const path = `${nearMissId}/${user.id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, body, { contentType, upsert: false });
-      if (upErr) throw new Error(`Couldn't upload that: ${upErr.message}`);
-
-      const { error: rowErr } = await supabase
-        .from('shared_photos')
-        .insert({ near_miss_id: nearMissId, owner_id: user.id, storage_path: path });
-      if (rowErr) {
-        // Don't leave an orphan file behind if the row is refused.
-        await supabase.storage.from(BUCKET).remove([path]).catch(() => {});
-        throw new Error(rowErr.message);
-      }
-
-      await get().load(nearMissId);
-    } finally {
-      set({ busy: { ...get().busy, [nearMissId]: false } });
-    }
+    await get().share(nearMissId, picked.assets.map((a) => ({
+      uri: a.uri,
+      isVideo: a.type === 'video',
+      filename: a.fileName,
+    })));
   },
 
   remove: async (nearMissId, photo) => {

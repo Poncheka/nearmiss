@@ -90,6 +90,15 @@ export const formatWhen = (iso: string) => {
 
 const midpoint = (n: RealNearMiss) => ({ lat: (n.my_lat + n.their_lat) / 2, lng: (n.my_lng + n.their_lng) / 2 });
 
+/** Rough metres between two points. Used only to sanity-check a geocoder answer. */
+function metresApart(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(toRad(bLat - aLat) / 2) ** 2
+    + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(toRad(bLng - aLng) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 /**
  * Asks the server for the actual venue — "Balthazar" rather than "SoHo, New York".
  *
@@ -139,6 +148,14 @@ async function namePlaces(items: RealNearMiss[], update: (id: string, name: stri
   }
 
   // Whatever Foursquare didn't know: the neighbourhood, from the phone.
+  //
+  // Apple's geocoder is rate limited, and when it is pushed it can hand back the answer to the
+  // previous question instead of an error. That is how a near miss on the Sunset Strip ended up
+  // labelled "Brooks Ave" — a street in Venice, and the name of the near miss looked up just
+  // before it. So: ask slowly, and throw away an answer identical to the last one unless the two
+  // places really are near each other.
+  let last: { name: string; lat: number; lng: number } | null = null;
+
   for (const n of todo.filter((x) => !venues.has(x.id))) {
     naming.add(n.id);
     try {
@@ -149,9 +166,19 @@ async function namePlaces(items: RealNearMiss[], update: (id: string, name: stri
       const main = p.name && p.name !== street && !/^\d/.test(p.name) ? p.name : p.district || p.street || p.city;
       const name = [main, p.city && p.city !== main ? p.city : null].filter(Boolean).join(', ');
       if (!name) continue;
+
+      if (last && last.name === name && metresApart(last.lat, last.lng, lat, lng) > 1000) {
+        // Same name, a kilometre or more apart: a repeat, not a coincidence. Leave it unnamed
+        // and let the next run try again with a cold geocoder.
+        last = null;
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
+      last = { name, lat, lng };
+
       update(n.id, name);
       await supabase.rpc('set_near_miss_place', { nm_id: n.id, name });
-      await new Promise((r) => setTimeout(r, 400)); // Apple limits how fast we can ask
+      await new Promise((r) => setTimeout(r, 600)); // Apple limits how fast we can ask
     } catch {
       // try again next time
     } finally {
