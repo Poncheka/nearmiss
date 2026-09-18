@@ -120,7 +120,9 @@ async function namePlaces(items: RealNearMiss[], update: (id: string, name: stri
   if (Platform.OS === 'web') return;
   let Location: typeof import('expo-location');
   try { Location = require('expo-location'); } catch { return; }
-  const todo = items.filter((n) => !n.place_name && !naming.has(n.id)).slice(0, 15);
+  // 25 is what the place-name function takes in one request; the phone-side fallback is the
+  // slow part, and it only runs for whatever Foursquare couldn't name.
+  const todo = items.filter((n) => !n.place_name && !naming.has(n.id)).slice(0, 25);
   if (!todo.length) return;
 
   // Venues first, in one request for the whole batch.
