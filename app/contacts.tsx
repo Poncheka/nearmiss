@@ -50,7 +50,7 @@ export default function ContactsSettings() {
 
   const unlink = () => Alert.alert(
     'Turn off contact matching?',
-    "Friends who have your number or email won't be able to find you here, and this phone forgets the contacts it read. Your friends and near misses are not affected.",
+    "Your code is deleted, so friends who have your number or email can no longer find you here, and only your @username will work. This phone also forgets the address book it read. Your friends and near misses are not affected.",
     [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -83,8 +83,13 @@ export default function ContactsSettings() {
         </IconTile>
         <Display size={32}>Contacts</Display>
         <Body size={17} color={colors.text2}>
-          Your contacts are never uploaded. Near Miss compares one-way fingerprints of email
-          addresses, and the server only answers with people who signed up with that address.
+          Your address book never leaves this phone.
+        </Body>
+        <Body size={15} color={colors.muted}>
+          For a friend to find you, Near Miss scrambled your own email address into a code that
+          cannot be turned back into an address. That code is the only thing stored. Their phone
+          scrambles the addresses in their contacts the same way and asks whether any of them
+          match, so the server never sees a readable address, and never sees their contacts.
         </Body>
 
         <Card style={{ padding: 16, gap: 14 }}>
@@ -136,7 +141,8 @@ export default function ContactsSettings() {
           </Body>
           <Body size={14} color={colors.muted}>
             This is the iOS permission, and only you can change it. Turning contact matching off
-            above does not revoke it, because an app cannot take back a permission you granted.
+            above does not revoke it, because an app cannot hand back a permission you granted.
+            It only stops Near Miss using it.
           </Body>
           {Platform.OS !== 'web' ? (
             <Button label="Open iOS Settings" variant="tint" onPress={() => Linking.openSettings()} />
