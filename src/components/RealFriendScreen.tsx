@@ -1,12 +1,14 @@
 // A friend, for real accounts: who they are, when you met, and every near miss between you.
 import { useCallback, useMemo } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Avatar } from '@/components/avatar';
 import { Body, Card, Chip, Display, Divider, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { useContacts } from '@/lib/contacts';
-import { formatWhen, kindLabel, nearLabel, placeLabel, useNearMisses } from '@/lib/nearMisses';
+import { useNearMisses } from '@/lib/nearMisses';
+import { NearMissCard } from '@/components/NearMissCard';
+import { useAuth } from '@/lib/auth';
 import { colors, pastel, radius } from '@/theme';
 
 export function RealFriendScreen({ id }: { id: string }) {
@@ -14,6 +16,9 @@ export function RealFriendScreen({ id }: { id: string }) {
   const status = useContacts((s) => s.statuses[id]);
   const items = useNearMisses((s) => s.items);
   const needsMet = useNearMisses((s) => s.needsMetOn.find((n) => n.friend_id === id));
+  const { profile } = useAuth();
+  const { width } = useWindowDimensions();
+  const cardWidth = Math.min(width, 640) - 40 - 2;
 
   useFocusEffect(useCallback(() => {
     useContacts.getState().refreshFriends();
@@ -33,33 +38,13 @@ export function RealFriendScreen({ id }: { id: string }) {
   // met_on isn't returned per friend here; if we're still asking about them, it's unset.
   const metKnown = !needsMet && misses.length > 0;
 
+  // The same card as the feed, so moving between the two doesn't feel like two different apps.
   const Section = ({ title, list }: { title: string; list: typeof misses }) => (
-    <View>
+    <View style={{ gap: 10 }}>
       <SectionLabel>{title}</SectionLabel>
-      <Card style={{ paddingHorizontal: 16, paddingVertical: 2 }}>
-        {list.map((nm, i) => {
-          const when = formatWhen(nm.closest_at);
-          return (
-            <View key={nm.id}>
-              <Pressable
-                onPress={() => router.push({ pathname: '/near-miss/[id]', params: { id: nm.id } })}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}
-              >
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Body size={16} weight="semibold" numberOfLines={1}>{placeLabel(nm).split(',')[0]}</Body>
-                  <Body size={13} color={colors.muted}>{when.date}</Body>
-                  <View style={{ flexDirection: 'row', gap: 6, paddingTop: 2 }}>
-                    <Chip label={kindLabel(nm)} tone={nm.kind === 'crossed' ? 'violet' : 'outline'} />
-                    <Chip label={nearLabel(nm)} tone="sand" />
-                  </View>
-                </View>
-                <ChevronRight size={18} color={colors.faint} />
-              </Pressable>
-              {i < list.length - 1 && <Divider />}
-            </View>
-          );
-        })}
-      </Card>
+      {list.map((nm) => (
+        <NearMissCard key={nm.id} nm={nm} width={cardWidth} myBirthday={profile?.birthday} />
+      ))}
     </View>
   );
 

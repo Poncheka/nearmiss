@@ -26,6 +26,9 @@ function RealRow({ item, last }: { item: RealActivity; last: boolean }) {
   const unread = !item.read_at;
 
   const go = () => {
+    // Reading it is what marks it read. Leaving the dot on something you just opened reads as
+    // a broken list.
+    useActivity.getState().markOneRead(item.id);
     if (item.near_miss_id) router.push(`/near-miss/${item.near_miss_id}` as Href);
     else if (item.actor_id) router.push(`/friend/${item.actor_id}` as Href);
   };

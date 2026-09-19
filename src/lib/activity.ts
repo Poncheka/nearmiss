@@ -28,6 +28,8 @@ type State = {
   load: () => Promise<void>;
   refreshUnread: () => Promise<void>;
   markAllRead: () => Promise<void>;
+  /** Opening one should clear it, not leave it bold. */
+  markOneRead: (id: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -91,5 +93,16 @@ export const useActivity = create<State>((set, get) => ({
     set({ unread: 0, items: get().items.map((i) => (i.read_at ? i : { ...i, read_at: now })) });
     await supabase.rpc('mark_activity_read').then(() => {}, () => {});
   },
+  markOneRead: async (id) => {
+    const item = get().items.find((i) => i.id === id);
+    if (!item || item.read_at) return;
+    const now = new Date().toISOString();
+    set({
+      items: get().items.map((i) => (i.id === id ? { ...i, read_at: now } : i)),
+      unread: Math.max(0, get().unread - 1),
+    });
+    await supabase.rpc('mark_activity_read_one', { a_id: id });
+  },
+
   reset: () => set({ items: [], unread: 0, loaded: false, loading: false }),
 }));
