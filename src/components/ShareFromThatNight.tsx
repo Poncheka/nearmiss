@@ -10,8 +10,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
-import { Check, Play } from 'lucide-react-native';
+import { Check, Expand, Play } from 'lucide-react-native';
 import { Body, TextLink } from '@/components/ui';
+import { ShotPreview } from '@/components/ShotPreview';
 import { RealNearMiss } from '@/lib/nearMisses';
 import { useSharedPhotos } from '@/lib/sharedPhotos';
 import { LocalShot, shotsFromThatDay } from '@/lib/thatDay';
@@ -39,6 +40,8 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   // Shared in this session: dropped from the strip so it doesn't offer the same photo twice.
   const [sent, setSent] = useState<Set<string>>(new Set());
+  // Position within the visible strip of whichever photo is open full size.
+  const [peek, setPeek] = useState<number | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -56,6 +59,8 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
     [shots, sent, alreadyShared],
   );
   const picked = useMemo(() => available.filter((s) => chosen.has(s.id)), [available, chosen]);
+  // The strip and the preview walk the same list, so "3 of 8" means what it says.
+  const shown = useMemo(() => available.slice(0, SHOWN), [available]);
 
   // Nothing found on this phone: no strip at all. The composer still has the picker for the
   // person who knows they have something we couldn't find.
@@ -111,7 +116,7 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}
         >
-          {available.slice(0, SHOWN).map((s) => {
+          {shown.map((s, i) => {
             const on = chosen.has(s.id);
             return (
               <Pressable
@@ -138,6 +143,15 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
                     {on ? <Check size={12} color={colors.white} strokeWidth={3} /> : null}
                   </View>
                 </View>
+                {/* 76pt is enough to remember a moment, not enough to choose one. */}
+                <Pressable
+                  accessibilityLabel="See this photo full size"
+                  onPress={() => setPeek(i)}
+                  hitSlop={4}
+                  style={{ position: 'absolute', right: 5, bottom: 5, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Expand size={11} color={colors.white} strokeWidth={2.4} />
+                </Pressable>
               </Pressable>
             );
           })}
@@ -161,6 +175,14 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
               </Body>}
         </Pressable>
       ) : null}
+
+      <ShotPreview
+        shots={shown}
+        startAt={peek}
+        chosen={chosen}
+        onToggle={toggle}
+        onClose={() => setPeek(null)}
+      />
     </View>
   );
 }

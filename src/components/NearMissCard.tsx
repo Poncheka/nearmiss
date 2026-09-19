@@ -46,7 +46,7 @@ export const NearMissCard = memo(function NearMissCard({ nm, width, myBirthday }
   tags.push({ label: kindLabel(nm), tone: nm.kind === 'crossed' ? 'violet' : 'outline' });
   if (occasion) tags.push({ label: occasion.label, tone: occasion.loud ? 'green' : 'outline' });
   if (nm.via_name) tags.push({ label: `Friend of ${nm.via_name.split(' ')[0]}`, tone: 'green' });
-  if (nm.is_before_met) tags.push({ label: 'Before you met', tone: 'coral' });
+  if (nm.is_before_met) tags.push({ label: 'Before you met', tone: 'violet' });
   return (
     <Pressable onPress={() => openNearMiss(nm.id)} accessibilityRole="button" accessibilityLabel={`${place}, you and ${name}, ${when.date}`}>
       <View style={{ backgroundColor: colors.card, borderRadius: radius.cardLg, borderWidth: 1, borderColor: colors.cardBorder, overflow: 'hidden' }}>

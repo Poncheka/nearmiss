@@ -7,8 +7,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronLeft, Images, Play } from 'lucide-react-native';
+import { Check, ChevronLeft, Expand, Images, Play } from 'lucide-react-native';
 import { Body, Button, Display, IconButton, Screen } from '@/components/ui';
+import { ShotPreview } from '@/components/ShotPreview';
 import { formatWhen, placeLabel, useNearMisses } from '@/lib/nearMisses';
 import { LocalShot, shotsFromThatDay } from '@/lib/thatDay';
 import { useSharedPhotos } from '@/lib/sharedPhotos';
@@ -25,6 +26,8 @@ export default function ThatDayPicker() {
 
   const [shots, setShots] = useState<LocalShot[] | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+  // Which photo is open full size, by position. Null means the grid.
+  const [peek, setPeek] = useState<number | null>(null);
 
   const tile = Math.floor((width - 40 - GAP * (COLUMNS - 1)) / COLUMNS);
 
@@ -112,7 +115,7 @@ export default function ThatDayPicker() {
             </Body>
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
-              {shots.map((s) => {
+              {shots.map((s, i) => {
                 const on = chosen.has(s.id);
                 return (
                   <Pressable
@@ -135,6 +138,15 @@ export default function ThatDayPicker() {
                         </View>
                       </View>
                     )}
+                    {/* Tapping the tile still picks it. This is the way to look first. */}
+                    <Pressable
+                      accessibilityLabel="See this photo full size"
+                      onPress={() => setPeek(i)}
+                      hitSlop={4}
+                      style={{ position: 'absolute', right: 6, bottom: 6, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Expand size={13} color={colors.white} strokeWidth={2.4} />
+                    </Pressable>
                   </Pressable>
                 );
               })}
@@ -143,6 +155,14 @@ export default function ThatDayPicker() {
           </>
         )}
       </ScrollView>
+
+      <ShotPreview
+        shots={shots ?? []}
+        startAt={peek}
+        chosen={chosen}
+        onToggle={toggle}
+        onClose={() => setPeek(null)}
+      />
 
       {shots !== null && shots.length > 0 && (
         <View style={{ paddingHorizontal: 20, paddingBottom: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.inputBorder, backgroundColor: colors.white }}>

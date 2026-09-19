@@ -180,7 +180,7 @@ export function RealNearMissScreen({ id }: { id: string }) {
               <Chip label={nearLabel(nm)} tone={barely ? 'coral' : 'outline'} />
               {occasion ? <Chip label={occasion.label} tone={occasion.loud ? 'green' : 'outline'} /> : null}
               {nm.via_name ? <Chip label={`Friend of ${nm.via_name.split(' ')[0]}`} tone="green" /> : null}
-              {nm.is_before_met ? <Chip label="Before you met" tone="coral" /> : null}
+              {nm.is_before_met ? <Chip label="Before you met" tone="violet" /> : null}
             </View>
 
             {/* The closest calls get said out loud. Everything else stays in the chips. */}

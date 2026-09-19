@@ -155,8 +155,8 @@ type Sort = 'timeline' | 'found';
 
 function SortTabs({ value, onChange }: { value: Sort; onChange: (v: Sort) => void }) {
   const tabs: { id: Sort; label: string }[] = [
-    { id: 'timeline', label: 'Timeline' },
     { id: 'found', label: 'Recently found' },
+    { id: 'timeline', label: 'Timeline' },
   ];
   return (
     <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: PAD, paddingBottom: 10 }}>
@@ -224,7 +224,7 @@ export default function Feed() {
   const activityRead = useStore((s) => s.activityRead);
   const cardWidth = Math.min(width, 640) - PAD * 2 - 2;
   const [showSince, setShowSince] = useState(false);
-  const [sort, setSort] = useState<Sort>('timeline');
+  const [sort, setSort] = useState<Sort>('found');
 
   // Oldest first, with a year label whenever the year changes.
   const rows = useMemo<Row[]>(() => {
@@ -300,7 +300,7 @@ export default function Feed() {
     const t: { label: string; tone: ChipTone }[] = [];
     if (nm.isNew && !seen[nm.id]) t.push({ label: 'New', tone: 'violet' });
     if (nm.viaFriendId) t.push({ label: `Friend of ${people[nm.viaFriendId].name}`, tone: 'green' });
-    if (isBeforeMet(met, nm)) t.push({ label: 'Before you met', tone: 'coral' });
+    if (isBeforeMet(met, nm)) t.push({ label: 'Before you met', tone: 'violet' });
     return t;
   };
 

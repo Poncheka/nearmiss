@@ -63,7 +63,7 @@ export default function Reveal() {
             <View style={{ gap: 14 }}>
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 <Chip label={`Near miss ${step} of 3`} tone="outline" />
-                {isBeforeMet(met, nm) ? <Chip label="Before you met" tone="coral" /> : <Chip label="Since you met" tone="violet" />}
+                {isBeforeMet(met, nm) ? <Chip label="Before you met" tone="violet" /> : <Chip label="Since you met" tone="violet" />}
               </View>
               <Display size={38}>{nm.place}</Display>
               <Body size={17} color={colors.text2}>{nm.dateLong} · {nm.time}</Body>

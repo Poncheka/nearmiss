@@ -74,7 +74,7 @@ function NearMissScreen({ id }: { id: string }) {
             <Body size={16} color={colors.text2}>{nm.placeFull}{'\n'}{nm.dateLong} · {nm.time}</Body>
             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
               <Chip label={`${nm.distance}m apart`} tone="outline" />
-              {before && <Chip label={gap > 0 ? `${gap} year${gap > 1 ? 's' : ''} before you met` : 'Before you met'} tone="coral" />}
+              {before && <Chip label={gap > 0 ? `${gap} year${gap > 1 ? 's' : ''} before you met` : 'Before you met'} tone="violet" />}
               {!!nm.viaFriendId && <Chip label={`Friend of ${people[nm.viaFriendId].name}`} tone="green" />}
             </View>
           </View>

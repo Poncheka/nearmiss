@@ -76,7 +76,7 @@ function DemoFriendPage() {
             <Body size={15} color={colors.muted}>{friend.handle}{friend.friendsSince ? ` · Friends since ${friend.friendsSince}` : ''}</Body>
             <View style={{ flexDirection: 'row', gap: 8, paddingTop: 6 }}>
               <Chip label={`${misses.length} near miss${misses.length === 1 ? '' : 'es'}`} tone="outline" />
-              {beforeCount > 0 && <Chip label={`${beforeCount} before you met`} tone="coral" />}
+              {beforeCount > 0 && <Chip label={`${beforeCount} before you met`} tone="violet" />}
             </View>
           </View>
 
@@ -137,7 +137,7 @@ function DemoFriendPage() {
                           </View>
                           <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                             <Chip label={`${r.nm.distance}m apart`} />
-                            {isBeforeMet(met, r.nm) && <Chip label="Before you met" tone="coral" />}
+                            {isBeforeMet(met, r.nm) && <Chip label="Before you met" tone="violet" />}
                             {unread[r.nm.id] ? <UnreadDot label={`${unread[r.nm.id]} new`} /> : null}
                           </View>
                         </Card>
