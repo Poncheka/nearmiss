@@ -67,3 +67,46 @@ export async function myBlocks(): Promise<BlockedPerson[]> {
   if (error) return [];
   return (data ?? []) as BlockedPerson[];
 }
+
+export type PublicProfile = {
+  id: string;
+  username: string | null;
+  name: string | null;
+  avatar_url: string | null;
+};
+
+export type FriendOf = {
+  user_id: string;
+  username: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  /** 'all' when you are their friend, 'mutual' when you are only seeing the overlap. */
+  scope: 'all' | 'mutual';
+};
+
+/**
+ * The few fields a stranger's profile needs.
+ *
+ * Row-level security only lets you read profiles of friends and people you have a near miss
+ * with, which is right, but it means someone you just found by username has no readable row.
+ * This returns the same four fields username search already gives back, and nothing more.
+ */
+export async function publicProfile(id: string): Promise<PublicProfile | null> {
+  const { data, error } = await supabase.rpc('public_profile', { uid: id });
+  if (error) return null;
+  const rows = (data ?? []) as PublicProfile[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Who they know, as much of it as you are entitled to see.
+ *
+ * Friends see the whole list. Everyone else sees only the people you both know, which is the
+ * part that helps you work out whether this is the right person. The scope comes back with the
+ * rows so the screen can say which it is showing instead of implying it is everyone.
+ */
+export async function friendsOf(id: string): Promise<FriendOf[]> {
+  const { data, error } = await supabase.rpc('friends_of', { uid: id });
+  if (error) return [];
+  return (data ?? []) as FriendOf[];
+}

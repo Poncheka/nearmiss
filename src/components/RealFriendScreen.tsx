@@ -1,6 +1,6 @@
 // A friend, for real accounts: who they are, when you met, and every near miss between you.
-import { useCallback, useMemo } from 'react';
-import { Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react-native';
 import { Avatar } from '@/components/avatar';
@@ -9,12 +9,13 @@ import { useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
 import { NearMissCard } from '@/components/NearMissCard';
 import { useAuth } from '@/lib/auth';
-import { blockUser, unfriend } from '@/lib/relationships';
+import { blockUser, FriendOf, friendsOf, PublicProfile, publicProfile, unfriend } from '@/lib/relationships';
 import { colors, pastel, radius } from '@/theme';
 
 export function RealFriendScreen({ id }: { id: string }) {
   const friend = useContacts((s) => s.friends.find((f) => f.id === id));
   const status = useContacts((s) => s.statuses[id]);
+  const statuses = useContacts((s) => s.statuses);
   const items = useNearMisses((s) => s.items);
   const needsMet = useNearMisses((s) => s.needsMetOn.find((n) => n.friend_id === id));
   const { profile } = useAuth();
@@ -33,6 +34,13 @@ export function RealFriendScreen({ id }: { id: string }) {
   const before = misses.filter((n) => n.is_before_met);
   const since = misses.filter((n) => !n.is_before_met);
 
+  // Someone found by search is neither a friend nor in a near miss, so there is nothing local
+  // to draw their profile from and row-level security will not hand us their row either. Ask
+  // the server for the four public fields instead.
+  const [stranger, setStranger] = useState<PublicProfile | null>(null);
+  const [circle, setCircle] = useState<FriendOf[] | null>(null);
+  const [adding, setAdding] = useState(false);
+
   // You can land here from a near miss with someone who isn't in your friends list, which is
   // exactly what a friend-of-a-friend match is. The near miss already carries their name and
   // picture, so use that rather than showing an empty profile.
@@ -42,7 +50,21 @@ export function RealFriendScreen({ id }: { id: string }) {
         username: misses[0].other_username,
         avatar_url: misses[0].other_avatar_url,
       }
-    : undefined);
+    : stranger ?? undefined);
+
+  const known = !!friend || misses.length > 0;
+  useEffect(() => {
+    if (known) return;
+    let live = true;
+    publicProfile(id).then((p) => { if (live) setStranger(p); }).catch(() => {});
+    return () => { live = false; };
+  }, [id, known]);
+
+  useEffect(() => {
+    let live = true;
+    friendsOf(id).then((f) => { if (live) setCircle(f); }).catch(() => { if (live) setCircle([]); });
+    return () => { live = false; };
+  }, [id]);
 
   const name = person?.name?.split(' ')[0] || (person?.username ? `@${person.username}` : 'Friend');
   const back = () => (router.canGoBack() ? router.back() : router.replace('/you'));
@@ -81,6 +103,26 @@ export function RealFriendScreen({ id }: { id: string }) {
     );
   };
 
+  const askToBeFriends = async () => {
+    if (adding) return;
+    setAdding(true);
+    try {
+      await useContacts.getState().addFriend(id);
+    } catch (e) {
+      Alert.alert("Couldn't send that", e instanceof Error ? e.message : String(e));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const addSomeone = async (who: string, label: string) => {
+    try {
+      await useContacts.getState().addFriend(who);
+    } catch (e) {
+      Alert.alert(`Couldn't add ${label}`, e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const openMenu = () => Alert.alert(name, undefined, [
     { text: 'Cancel', style: 'cancel' },
     { text: `Remove ${name}`, style: 'destructive', onPress: () => leave('unfriend') },
@@ -117,6 +159,20 @@ export function RealFriendScreen({ id }: { id: string }) {
           {status && status !== 'friends' ? (
             <Chip label={status === 'requested' ? 'Request sent' : 'Wants to be friends'} tone="outline" />
           ) : null}
+          {/* Reaching a profile and having no way to act on it is the dead end this fixes. */}
+          {status !== 'friends' && status !== 'requested' ? (
+            adding
+              ? <ActivityIndicator color={colors.violet} style={{ paddingVertical: 6 }} />
+              : <Pressable
+                  accessibilityLabel={status === 'incoming' ? `Accept ${name}` : `Add ${name}`}
+                  onPress={askToBeFriends}
+                  style={{ minHeight: 40, paddingHorizontal: 22, borderRadius: radius.pill, backgroundColor: colors.violet, alignItems: 'center', justifyContent: 'center', marginTop: 4 }}
+                >
+                  <Body size={15} weight="bold" color={colors.white}>
+                    {status === 'incoming' ? 'Accept' : 'Add friend'}
+                  </Body>
+                </Pressable>
+          ) : null}
           <Body size={15} color={colors.text2} style={{ paddingTop: 6 }}>
             {misses.length === 0
               ? 'No near misses yet'
@@ -141,6 +197,53 @@ export function RealFriendScreen({ id }: { id: string }) {
             </Card>
           </Pressable>
         )}
+
+        {/* Who they know. Friends see the whole list; everyone else sees only the overlap, and
+            the heading says which, because "Friends" over a filtered list is a lie. */}
+        {circle && circle.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            <SectionLabel>
+              {circle[0].scope === 'all'
+                ? `${name}'s friends`
+                : `You both know${circle.length > 1 ? ` (${circle.length})` : ''}`}
+            </SectionLabel>
+            <Card style={{ paddingHorizontal: 16, paddingVertical: 2 }}>
+              {circle.map((f, i) => {
+                const who = f.name || (f.username ? `@${f.username}` : 'Someone');
+                const theirStatus = statuses[f.user_id];
+                return (
+                  <View key={f.user_id}>
+                    <Pressable
+                      accessibilityLabel={`Open ${who}'s profile`}
+                      onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.user_id } })}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}
+                    >
+                      {f.avatar_url
+                        ? <Image source={{ uri: f.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                        : <Avatar initial={who.replace('@', '').charAt(0).toUpperCase()} color={pastel.lilac} size={40} />}
+                      <View style={{ flex: 1 }}>
+                        <Body size={16} weight="semibold" numberOfLines={1}>{who}</Body>
+                        {f.username ? <Body size={13} color={colors.muted}>@{f.username}</Body> : null}
+                      </View>
+                      {theirStatus === 'friends' ? <Chip label="Friends" tone="sand" />
+                        : theirStatus === 'requested' ? <Chip label="Requested" tone="sand" />
+                        : <Pressable
+                            accessibilityLabel={`Add ${who}`}
+                            onPress={() => addSomeone(f.user_id, who)}
+                            style={{ minHeight: 34, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.violetTint, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Body size={14} weight="bold" color={colors.violet}>
+                              {theirStatus === 'incoming' ? 'Accept' : 'Add'}
+                            </Body>
+                          </Pressable>}
+                    </Pressable>
+                    {i < circle.length - 1 && <Divider />}
+                  </View>
+                );
+              })}
+            </Card>
+          </View>
+        ) : null}
 
         {before.length > 0 && <Section title="Before you met" list={before} />}
         {since.length > 0 && <Section title={metKnown ? 'Since you met' : 'Near misses'} list={since} />}

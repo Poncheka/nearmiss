@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, SectionList, Share, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
-import { BookUser, Search, Share as ShareIcon } from 'lucide-react-native';
+import { BookUser, Search, Share as ShareIcon, X } from 'lucide-react-native';
 import { Body, Button, Card, Display, Pill, ProgressDots, Screen, SectionLabel } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
@@ -197,8 +197,20 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
               placeholder={(demo ? demoContacts : c.contacts).length ? `Search contacts or @username` : 'Search @username'}
               placeholderTextColor={colors.faint}
               autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
               style={{ flex: 1, fontFamily: fonts.regular, fontSize: 16, color: colors.ink, height: 44 }}
             />
+            {q.length > 0 ? (
+              <Pressable
+                accessibilityLabel="Clear search"
+                onPress={() => setQ('')}
+                hitSlop={10}
+                style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: colors.inputBorder, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={13} color={colors.ink} strokeWidth={2.6} />
+              </Pressable>
+            ) : null}
           </View>
         )}
       </View>
@@ -230,8 +242,14 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
             const u = item.user;
             const status = statuses[u.id];
             const title = u.name || (u.username ? `@${u.username}` : 'Near Miss member');
+            // Finding someone and only being offered "Add" is a dead end: you cannot check it
+            // is the right Sarah first. The row opens their profile; the pill still adds.
             return (
-              <View style={rowStyle}>
+              <Pressable
+                accessibilityLabel={`Open ${title}'s profile`}
+                onPress={() => router.push({ pathname: '/friend/[id]', params: { id: u.id } })}
+                style={rowStyle}
+              >
                 <UserAvatar id={u.id} name={title} url={u.avatar_url} />
                 <View style={{ flex: 1 }}>
                   <Body size={16} weight="semibold" numberOfLines={1}>{title}</Body>
@@ -243,7 +261,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
                   : status === 'incoming' ? <Pill label="Accept" onPress={() => add(u.id)} />
                   : <Pill label="Add" onPress={() => add(u.id)} />}
                 {divider}
-              </View>
+              </Pressable>
             );
           }
           const p = item.contact;

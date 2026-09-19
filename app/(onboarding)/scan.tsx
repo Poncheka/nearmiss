@@ -106,13 +106,18 @@ export default function Scan() {
               <ScanArt />
             </View>
             <View style={{ gap: 10 }}>
-              <Display size={34}>Scan your photos</Display>
-              <Body size={17} color={colors.text2}>We read where and when each photo was taken to find your near misses. The photos themselves stay on your phone.</Body>
+              <Display size={34}>Your photos' data, not your photos</Display>
+              <Body size={17} color={colors.text2}>
+                Every photo records when and where it was taken. Near Miss reads those two things
+                and saves nothing else. The picture never leaves your phone, and nobody here can
+                open your library or see what is in it.
+              </Body>
             </View>
             <View style={{ gap: 10 }}>
-              <Point icon={<Lock size={16} color={colors.violet} strokeWidth={2.2} />} label="Only the time and place are saved" />
-              <Point icon={<ShieldCheck size={16} color={colors.violet} strokeWidth={2.2} />} label="Last 30 days are never matched" />
-              <Point icon={<House size={16} color={colors.violet} strokeWidth={2.2} />} label="Hide places like home any time in settings" />
+              <Point icon={<Lock size={16} color={colors.violet} strokeWidth={2.2} />} label="A time and a place. That is all that is saved" />
+              <Point icon={<ImageOff size={16} color={colors.violet} strokeWidth={2.2} />} label="No photo is ever uploaded or looked at" />
+              <Point icon={<Check size={16} color={colors.violet} strokeWidth={2.2} />} label="Sharing an actual photo is always your choice, later" />
+              <Point icon={<House size={16} color={colors.violet} strokeWidth={2.2} />} label="Hide places like home, and skip the last 30 days" />
             </View>
             {scan.error ? <Body size={14} color={colors.danger}>{scan.error}</Body> : null}
             {access === 'unavailable' && !demo ? (
@@ -121,9 +126,12 @@ export default function Scan() {
               </Card>
             ) : null}
             <View style={{ gap: 4 }}>
-              {access !== 'unavailable' || demo ? <Button label={scan.error ? 'Try again' : 'Scan my photos'} onPress={begin} /> : null}
+              {access !== 'unavailable' || demo ? <Button label={scan.error ? 'Try again' : 'Find my near misses'} onPress={begin} /> : null}
               {access !== 'granted' && access !== 'unavailable' && (
-                <Body size={13} color={colors.muted} style={{ textAlign: 'center', paddingTop: 4 }}>Choose "Allow Full Access" when asked</Body>
+                <Body size={13} color={colors.muted} style={{ textAlign: 'center', paddingTop: 4 }}>
+                  iOS will ask next. Full Access lets us read the dates and places; with Limited we
+                  only see the handful you pick, so most of your history stays invisible to us.
+                </Body>
               )}
               <Button label="Skip for now" variant="text" onPress={next} />
             </View>
