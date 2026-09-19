@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Vie
 import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
+import * as Clipboard from 'expo-clipboard';
 import * as Updates from 'expo-updates';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Body, Card, Divider, IconButton, Screen, SectionLabel, TextLink, Toggle } from '@/components/ui';
@@ -45,16 +46,30 @@ function VersionRow() {
   const when = Updates.createdAt
     ? new Date(Updates.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : null;
+  // The first chunk of the update's id, which is what actually names one bundle rather than
+  // another. "Updated Sep 19" cannot tell two of the same day apart, and that is exactly the
+  // question that comes up when a fix is supposed to have landed.
+  const stamp = onUpdate && Updates.updateId ? Updates.updateId.slice(0, 8) : null;
+
+  const copy = () => {
+    Clipboard.setStringAsync([
+      `Near Miss ${version} (${Updates.channel ?? 'no channel'})`,
+      `runtime ${Updates.runtimeVersion ?? '?'}`,
+      onUpdate ? `update ${Updates.updateId}` : 'running the installed bundle',
+      Updates.createdAt ? `published ${new Date(Updates.createdAt).toISOString()}` : null,
+    ].filter(Boolean).join('\n')).catch(() => {});
+    Alert.alert('Copied', 'Paste this when something looks wrong and we can tell which code you are on.');
+  };
 
   return (
-    <View style={{ alignItems: 'center', paddingTop: 22, gap: 2 }}>
+    <Pressable onPress={copy} accessibilityLabel="Copy version details" style={{ alignItems: 'center', paddingTop: 22, gap: 2 }}>
       <Body size={13} color={colors.faint}>Near Miss {version}</Body>
       <Body size={12} color={colors.faint}>
         {__DEV__ ? 'Development'
-          : onUpdate ? `Updated${when ? ` ${when}` : ''}`
+          : onUpdate ? `Updated${when ? ` ${when}` : ''}${stamp ? ` · ${stamp}` : ''}`
           : 'As installed'}
       </Body>
-    </View>
+    </Pressable>
   );
 }
 

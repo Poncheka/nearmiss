@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import { Href, router, useFocusEffect } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronLeft, Heart, ImageIcon, LucideIcon, MapPin, MessageCircle, UserPlus } from 'lucide-react-native';
 import { Body, Card, Display, Divider, IconButton, Pill, Screen, SectionLabel, TextLink } from '@/components/ui';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { activity, activityBadge, ActivityItem } from '@/data/mock';
@@ -11,19 +11,29 @@ import { actorName, activityText, activityWhen, RealActivity, useActivity } from
 import { useContacts } from '@/lib/contacts';
 import { colors, pastel } from '@/theme';
 
-const badgeFor: Record<string, string> = {
-  friend_request: colors.violet,
-  friend_accepted: colors.greenText,
-  comment: colors.coral,
-  near_miss: colors.coral,
-  photo_shared: colors.greenText,
+// The badge says what kind of thing happened. It used to be a coloured circle with a white dot
+// in it, which is exactly what an unread pip looks like, and it rendered on every row whether
+// read or not. So a notification you had already opened still looked unopened, and the only
+// honest reading was that marking as read was broken. It wasn't. The badge was lying.
+const badgeFor: Record<string, { color: string; Icon: LucideIcon }> = {
+  friend_request: { color: colors.violet, Icon: UserPlus },
+  friend_accepted: { color: colors.greenText, Icon: Check },
+  comment: { color: colors.coral, Icon: MessageCircle },
+  reply: { color: colors.coral, Icon: MessageCircle },
+  reaction: { color: colors.coral, Icon: Heart },
+  near_miss: { color: colors.coral, Icon: MapPin },
+  fof_near_miss: { color: colors.coral, Icon: MapPin },
+  met_changed: { color: colors.violet, Icon: CalendarDays },
+  photo_shared: { color: colors.greenText, Icon: ImageIcon },
 };
+const defaultBadge = { color: colors.violet, Icon: MapPin };
 
 function RealRow({ item, last }: { item: RealActivity; last: boolean }) {
   const [busy, setBusy] = useState(false);
   const status = useContacts((s) => (item.actor_id ? s.statuses[item.actor_id] : undefined));
   const name = actorName(item);
   const unread = !item.read_at;
+  const badge = badgeFor[item.type] ?? defaultBadge;
 
   const go = () => {
     // Reading it is what marks it read. Leaving the dot on something you just opened reads as
@@ -55,8 +65,8 @@ function RealRow({ item, last }: { item: RealActivity; last: boolean }) {
           {item.actor_avatar_url
             ? <Image source={{ uri: item.actor_avatar_url }} style={{ width: 44, height: 44, borderRadius: 22 }} />
             : <Avatar initial={name.replace('@', '').charAt(0).toUpperCase()} color={pastel.peach} size={44} />}
-          <View style={{ position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: badgeFor[item.type] ?? colors.violet, borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.white }} />
+          <View style={{ position: 'absolute', right: -2, bottom: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: badge.color, borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
+            <badge.Icon size={10} color={colors.white} strokeWidth={2.6} />
           </View>
         </View>
         <View style={{ flex: 1, gap: 4 }}>

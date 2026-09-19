@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUp, ChevronLeft, ChevronRight, ImagePlus, Play } from 'lucide-react-native';
+import { ArrowUp, ChevronLeft, ChevronRight, ImagePlus } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { NearMissGallery } from '@/components/NearMissGallery';
 import { ReactionBar } from '@/components/ReactionBar';
+import { SharedVideo } from '@/components/SharedVideo';
 import { ShareFromThatNight } from '@/components/ShareFromThatNight';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -233,18 +234,17 @@ export function RealNearMissScreen({ id }: { id: string }) {
                         onPress={() => openPhoto(entry.photo)}
                         style={{ width: THUMB, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.sand }}
                       >
-                        {entry.photo.url ? (
-                          <Image source={{ uri: entry.photo.url }} style={{ width: THUMB, height: THUMB }} resizeMode="cover" />
-                        ) : (
+                        {!entry.photo.url ? (
                           <View style={{ width: THUMB, height: THUMB, alignItems: 'center', justifyContent: 'center' }}>
                             <ActivityIndicator color={colors.violet} />
                           </View>
+                        ) : entry.photo.isVideo ? (
+                          // A video needs the player to show a frame. Image can't decode an mp4,
+                          // so pointing one at the clip gave a blank box with a play badge on it.
+                          <SharedVideo uri={entry.photo.url} width={THUMB} height={THUMB} />
+                        ) : (
+                          <Image source={{ uri: entry.photo.url }} style={{ width: THUMB, height: THUMB }} resizeMode="cover" />
                         )}
-                        {entry.photo.isVideo ? (
-                          <View style={{ position: 'absolute', left: 10, bottom: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
-                            <Play size={13} color={colors.white} fill={colors.white} />
-                          </View>
-                        ) : null}
                       </Pressable>
                     )}
                     {nm ? (
