@@ -20,6 +20,8 @@ const MAX_BYTES = 50 * 1024 * 1024;
 
 export type SharedPhoto = {
   id: string;
+  /** Set for anything shared from that day's photos; null for older shares. */
+  asset_id?: string | null;
   owner_id: string;
   owner_name: string | null;
   owner_avatar_url: string | null;
@@ -34,7 +36,13 @@ export type SharedPhoto = {
 const looksLikeVideo = (path: string) => /\.(mp4|mov|m4v|qt)$/i.test(path);
 
 /** A file on this phone, ready to go: from that day's photos, or from the full picker. */
-export type Shareable = { uri: string; isVideo: boolean; filename?: string | null };
+export type Shareable = {
+  uri: string;
+  isVideo: boolean;
+  filename?: string | null;
+  /** The phone's asset id, so the same photo can't be shared to one near miss twice. */
+  assetId?: string | null;
+};
 
 type State = {
   byNearMiss: Record<string, SharedPhoto[]>;
@@ -102,11 +110,14 @@ export const useSharedPhotos = create<State>((set, get) => ({
 
           const { error: rowErr } = await supabase
             .from('shared_photos')
-            .insert({ near_miss_id: nearMissId, owner_id: user.id, storage_path: path });
+            .insert({ near_miss_id: nearMissId, owner_id: user.id, storage_path: path, asset_id: shot.assetId ?? null });
           if (rowErr) {
             // Don't leave an orphan file behind if the row is refused.
             await supabase.storage.from(BUCKET).remove([path]).catch(() => {});
-            throw new Error(rowErr.message);
+            // 23505 is the unique index: this exact photo is already on this near miss.
+            throw new Error(rowErr.code === '23505'
+              ? 'You already shared that one.'
+              : rowErr.message);
           }
           sent += 1;
         } catch (e) {

@@ -23,6 +23,10 @@ const TILE = 76;
 
 export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss; name: string; theyShared: boolean }) {
   const busy = useSharedPhotos((s) => !!s.busy[nm.id]);
+  // Anything already on this near miss drops out of the strip, so the same photo can't be sent
+  // twice and pile up in the carousel.
+  const alreadyShared = useSharedPhotos((s) =>
+    new Set((s.byNearMiss[nm.id] ?? []).map((p) => p.asset_id).filter(Boolean) as string[]));
   const [shots, setShots] = useState<LocalShot[] | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   // Shared in this session: dropped from the strip so it doesn't offer the same photo twice.
@@ -39,7 +43,10 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
     return () => { live = false; };
   }, [nm.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const available = useMemo(() => (shots ?? []).filter((s) => !sent.has(s.id)), [shots, sent]);
+  const available = useMemo(
+    () => (shots ?? []).filter((s) => !sent.has(s.id) && !alreadyShared.has(s.id)),
+    [shots, sent, alreadyShared],
+  );
   const picked = useMemo(() => available.filter((s) => chosen.has(s.id)), [available, chosen]);
 
   // Nothing found on this phone: no strip at all. The composer still has the picker for the
@@ -59,6 +66,7 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
         uri: s.uri,
         isVideo: s.isVideo,
         filename: s.filename,
+        assetId: s.id,
       })));
       setSent((prev) => new Set([...prev, ...picked.map((s) => s.id)]));
       setChosen(new Set());

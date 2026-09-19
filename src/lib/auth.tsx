@@ -126,13 +126,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [linkError, setLinkError] = useState('');
   const [userLoaded, setUserLoaded] = useState(false);
 
+  /**
+   * Reads the profile and settings for a signed-in user, with retries.
+   *
+   * The retries are not paranoia. Signing in by magic link establishes the session through a
+   * deep link rather than in the call that returns it, so this can fire in the moment before
+   * the client has applied it. Row-level security then sees no user, returns no row, and the
+   * app renders someone with no name, no username and no photo, while their profile sits
+   * perfectly intact in the database. That happened to Leigh.
+   *
+   * An empty result for a user who is definitely signed in is therefore treated as "too early"
+   * rather than "nothing there", and asked again.
+   */
   const loadUser = useCallback(async (userId: string) => {
-    const [p, s] = await Promise.all([
-      supabase.from('profiles').select('id, username, name, bio, avatar_url, birthday').eq('id', userId).maybeSingle(),
-      supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
-    ]);
-    if (p.data) setProfile(p.data);
-    if (s.data) setSettings({ ...defaultSettings, ...(s.data as Partial<Settings>) });
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const [p, s] = await Promise.all([
+        supabase.from('profiles').select('id, username, name, bio, avatar_url, birthday').eq('id', userId).maybeSingle(),
+        supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
+      ]);
+      if (s.data) setSettings({ ...defaultSettings, ...(s.data as Partial<Settings>) });
+      if (p.data) {
+        setProfile(p.data);
+        setUserLoaded(true);
+        return;
+      }
+      // No row and no error means the read was refused or arrived too early. Wait and ask again.
+      if (p.error && p.error.code !== 'PGRST116') break;
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+    // Out of attempts. Let the app through rather than trapping someone on a spinner; the next
+    // focus or sign-in will fill it in.
     setUserLoaded(true);
   }, []);
 

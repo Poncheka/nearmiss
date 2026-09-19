@@ -54,6 +54,7 @@ export default function ThatDayPicker() {
         uri: s.uri,
         isVideo: s.isVideo,
         filename: s.filename,
+        assetId: s.id,
       })));
       back();
     } catch (e) {
