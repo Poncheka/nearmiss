@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { X } from 'lucide-react-native';
-import { Body, Button, Chip, Display, IconButton, Screen } from '@/components/ui';
+import { Body, Button, Chip, Display, IconButton, Screen, Wordmark } from '@/components/ui';
 import { AvatarPair } from '@/components/avatar';
 import { MiniMap } from '@/components/art';
 import { nearMisses } from '@/data/mock';
@@ -78,7 +78,7 @@ export default function Reveal() {
             <View style={{ gap: 14 }}>
               <View style={{ borderRadius: 28, backgroundColor: colors.violet, paddingHorizontal: 22, paddingVertical: 24, gap: 16 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Display size={18} style={{ color: colors.white }}>📍 near miss</Display>
+                  <Wordmark size={18} color={colors.white} />
                   <AvatarPair otherId="maya" size={36} />
                 </View>
                 <Display size={34} style={{ color: colors.white }}>Jeff and Maya were 22m apart at the Fillmore.</Display>

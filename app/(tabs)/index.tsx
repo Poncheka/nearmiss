@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Bell, ChevronRight, MessageCircle } from 'lucide-react-native';
-import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot } from '@/components/ui';
+import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot, Wordmark } from '@/components/ui';
 import { Avatar, AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { useAuth } from '@/lib/auth';
@@ -415,7 +415,7 @@ export default function Feed() {
   return (
     <Screen>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Display size={28}>📍 near miss</Display>
+        <Wordmark size={28} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View>
             <IconButton label="Activity" onPress={() => router.push('/activity')}>

@@ -35,6 +35,22 @@ export function Display({ children, size = 32, style, numberOfLines }: { childre
   );
 }
 
+/**
+ * The app's name, with the pin.
+ *
+ * Display sets a tight 1.06 line height, which suits the typeface and clips the emoji: the pin
+ * renders taller than the Latin glyphs, so its point was being cut off at the bottom on both the
+ * feed and the sign-in screen. The emoji gets its own box with room to breathe.
+ */
+export function Wordmark({ size = 28, color = colors.ink, style }: { size?: number; color?: string; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: size * 0.22 }, style]}>
+      <Text style={{ fontSize: size * 0.86, lineHeight: Math.round(size * 1.34) }}>📍</Text>
+      <Display size={size} style={{ color }}>near miss</Display>
+    </View>
+  );
+}
+
 export function Body({ children, size = 16, color = colors.ink, weight = 'regular', style, numberOfLines }: {
   children: ReactNode; size?: number; color?: string; weight?: 'regular' | 'medium' | 'semibold' | 'bold'; style?: StyleProp<TextStyle>; numberOfLines?: number;
 }) {

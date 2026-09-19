@@ -129,15 +129,6 @@ export default function You() {
           )}
         </View>
 
-        <Pressable onPress={() => router.push('/settings')}>
-          <Card style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Body size={16} weight="semibold">Settings</Body>
-              <Body size={14} color={colors.muted}>Privacy, hidden places, photo data, notifications</Body>
-            </View>
-            <ChevronRight size={18} color={colors.faint} />
-          </Card>
-        </Pressable>
       </ScrollView>
     </Screen>
   );

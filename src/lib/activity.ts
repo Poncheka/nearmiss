@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
-export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared';
+export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed';
 
 export type RealActivity = {
   id: string;
@@ -44,6 +44,9 @@ export function activityText(a: RealActivity): string {
     // we wrote here would be wrong by the time it was read.
     case 'near_miss': return 'and you have new near misses';
     case 'photo_shared': return a.place_name ? `shared a photo from ${a.place_name.split(',')[0]}` : 'shared a photo from that day';
+    // Worth telling them: this is what moves near misses between "before you met" and the rest,
+    // so their feed rearranges itself and otherwise there is nothing to explain why.
+    case 'met_changed': return 'set when you two met';
     default: return 'did something';
   }
 }

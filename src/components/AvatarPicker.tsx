@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera } from 'lucide-react-native';
+import { Camera, Pencil } from 'lucide-react-native';
 import { PersonAvatar } from '@/components/avatar';
 import { TextLink } from '@/components/ui';
 import { errorMessage, useAuth } from '@/lib/auth';
@@ -59,9 +59,11 @@ export function AvatarPicker({ size = 104, showLink = true }: { size?: number; s
           </View>
         )}
       </Pressable>
-      {!showLink && !url && (
-        <View pointerEvents="none" style={{ position: 'absolute', right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.violet, borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
-          <Camera size={12} color={colors.white} strokeWidth={2.2} />
+      {/* The badge is how you know the picture is a button. It used to disappear once you had a
+          photo, which is exactly when nothing else says the avatar is tappable. */}
+      {!showLink && (
+        <View pointerEvents="none" style={{ position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: colors.violet, borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
+          <Pencil size={12} color={colors.white} strokeWidth={2.4} />
         </View>
       )}
       {showLink && <TextLink label={url ? 'Change photo' : 'Add photo'} onPress={pick} />}

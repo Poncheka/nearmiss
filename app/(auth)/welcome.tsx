@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { Body, Button, Display, Screen, TextLink } from '@/components/ui';
+import { Body, Button, Display, Screen, TextLink, Wordmark } from '@/components/ui';
 import { WelcomeArt } from '@/components/art';
 import { errorMessage, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
 import { colors, radius } from '@/theme';
@@ -42,7 +42,7 @@ export default function Welcome() {
   return (
     <Screen edges={['top', 'bottom']}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 }}>
-        <Display size={22}>📍 near miss</Display>
+        <Wordmark size={22} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <WelcomeArt />
         </View>

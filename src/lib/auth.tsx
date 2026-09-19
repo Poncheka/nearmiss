@@ -35,7 +35,10 @@ export type Settings = {
 };
 
 const defaultSettings: Settings = {
-  audience: 'fof',
+  // Friends only to start. Friend-of-a-friend works and stays available, but it means someone
+  // you have never met can be told where you were, and that is a choice to make rather than
+  // discover.
+  audience: 'friends',
   notify_photos: true,
   notify_replies: true,
   notify_joins: true,
@@ -71,6 +74,22 @@ type AuthState = {
   finishOnboarding: () => Promise<void>;
   uploadAvatar: (image: { uri: string; mimeType?: string | null }) => Promise<void>;
 };
+
+/** Everything this person has in storage: their avatar, and anything they shared. */
+async function removeMyFiles(uid: string) {
+  const { data: avatars } = await supabase.storage.from('avatars').list(uid);
+  if (avatars?.length) {
+    await supabase.storage.from('avatars').remove(avatars.map((f) => `${uid}/${f.name}`));
+  }
+
+  // Shared photos are stored as <near_miss_id>/<owner_id>/<file>, so the rows are the index.
+  const { data: shared } = await supabase
+    .from('shared_photos')
+    .select('storage_path')
+    .eq('owner_id', uid);
+  const paths = (shared ?? []).map((r) => (r as { storage_path: string }).storage_path);
+  if (paths.length) await supabase.storage.from('shared-photos').remove(paths);
+}
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -254,6 +273,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deleteAccount = useCallback(async () => {
     if (demo || !session) { await signOut(); return; }
     const uid = session.user.id;
+
+    // Files first, through the Storage API.
+    //
+    // The database cannot do this part: Supabase refuses plain SQL deletes against
+    // storage.objects, and trying it inside delete_my_account rolled the whole thing back, so
+    // the account survived every attempt. Storage failures here are not fatal, because leaving
+    // an orphaned file behind is a far better outcome than an account that will not delete.
+    await removeMyFiles(uid).catch(() => {});
+
     const { error } = await supabase.rpc('delete_my_account');
     if (error) throw new UserFacingError(`Couldn't delete your account: ${error.message}`);
     // The account is gone, so forget where the last scan got to on this phone too.
