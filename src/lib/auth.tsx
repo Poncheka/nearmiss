@@ -321,7 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const saveProfile = useCallback(async ({ username, name, bio, birthday }: { username: string; name: string; bio: string; birthday?: string | null }) => {
     const clean = username.trim().replace(/^@/, '').toLowerCase();
     if (!/^[a-z0-9_.]{3,24}$/.test(clean)) {
-      throw new UserFacingError('Usernames are 3–24 characters: letters, numbers, dots and underscores.');
+      throw new UserFacingError('Usernames are 3 to 24 characters: letters, numbers, dots and underscores.');
     }
     const patch: Record<string, unknown> = { username: clean, name: name.trim() || null, bio: bio.trim() || null };
     // Left out entirely when not passed, so saving a name can't wipe a birthday set elsewhere.

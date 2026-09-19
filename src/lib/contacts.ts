@@ -11,6 +11,10 @@ import { useNearMisses } from '@/lib/nearMisses';
 
 /** Remembers that contact matching was turned off, so a relaunch doesn't re-register you. */
 const UNLINKED_KEY = 'nearmiss.contacts.unlinked';
+/** Last read of the address book, so opening Search paints instantly instead of re-reading. */
+const CACHE_KEY = 'nearmiss.contacts.cache.v2';
+/** email -> sha256, so an address is only ever hashed once on this phone. */
+const HASH_KEY = 'nearmiss.contacts.hashes.v2';
 
 type ContactsModule = typeof import('expo-contacts');
 
@@ -24,6 +28,8 @@ export type PhoneContact = {
   /** Raw addresses, kept on the phone. Only one-way hashes of these are ever sent. */
   emails: string[];
   emailHashes: string[];
+  /** False for shortcodes and nameless rows: still searchable, just not worth browsing. */
+  browsable: boolean;
 };
 
 export type AppUser = { id: string; username: string | null; name: string | null; avatar_url: string | null; contactName?: string };
@@ -35,7 +41,64 @@ export const inviteLink = (username?: string | null) => `${INVITE_BASE_URL}/i/${
 export const inviteMessage = (username?: string | null) =>
   `Hey! I just joined Near Miss. Let's find out where we might have crossed paths before we met: ${inviteLink(username)}`;
 
-const hash = (s: string) => bytesToHex(sha256(utf8ToBytes(s.trim().toLowerCase())));
+const hashOnce = (s: string) => bytesToHex(sha256(utf8ToBytes(s.trim().toLowerCase())));
+
+/**
+ * Hashing, remembered and spread out.
+ *
+ * SHA-256 in JavaScript is not slow, but four thousand of them in one synchronous loop locks the
+ * UI thread for long enough to look broken, and it used to happen on every visit to the tab.
+ * Addresses we have hashed before come from the table; the rest are done in small batches that
+ * yield to the interface between them.
+ */
+const memo = new Map<string, string>();
+
+async function loadHashMemo() {
+  if (memo.size) return;
+  try {
+    const raw = await AsyncStorage.getItem(HASH_KEY);
+    if (raw) for (const [k, v] of Object.entries(JSON.parse(raw) as Record<string, string>)) memo.set(k, v);
+  } catch { /* a cold cache just means we hash again */ }
+}
+
+const idle = () => new Promise<void>((r) => setTimeout(r, 0));
+
+async function hashAll(emails: string[]): Promise<string[]> {
+  await loadHashMemo();
+  const out: string[] = [];
+  let sinceBreath = 0;
+  let added = false;
+  for (const e of emails) {
+    let h = memo.get(e);
+    if (!h) {
+      h = hashOnce(e);
+      memo.set(e, h);
+      added = true;
+      if (++sinceBreath >= 200) { sinceBreath = 0; await idle(); }
+    }
+    out.push(h);
+  }
+  if (added) {
+    AsyncStorage.setItem(HASH_KEY, JSON.stringify(Object.fromEntries(memo))).catch(() => {});
+  }
+  return out;
+}
+
+/**
+ * Domains people actually sign up to a social app with.
+ *
+ * A work address is the one least likely to be on Near Miss, so when a contact has several, the
+ * personal one is the one worth showing and the one worth trying first.
+ */
+const PERSONAL = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|msn|aol|icloud|me|mac|proton|protonmail|pm|hey|fastmail|gmx|zoho|mail|yandex|comcast|verizon|att|sbcglobal|cox|bellsouth|btinternet|orange|free|web|t-online)\./i;
+
+/** Junk in an address book: shortcodes, voicemail entries, rows with no human name. */
+const looksLikeJunk = (name: string, phones: string[]) => {
+  if (!/\p{L}/u.test(name)) return true;                       // no letters at all
+  if (/^[*#]/.test(name.trim())) return true;                   // *611, #MyAccount
+  if (phones.length && phones.every((p) => /^[*#]/.test(p.trim()))) return true;
+  return false;
+};
 
 function lib(): ContactsModule | null {
   if (Platform.OS === 'web') return null;
@@ -79,18 +142,27 @@ async function readContacts(): Promise<PhoneContact[]> {
     const emails = (r.emails ?? []).map((e) => e.address?.trim().toLowerCase()).filter((e): e is string => !!e && e.includes('@'));
     if (!name || (phones.length === 0 && emails.length === 0)) continue;
     const mobile = (r.phones ?? []).find((p) => /mobile|iphone|cell/i.test(p.label ?? ''))?.number ?? phones[0] ?? null;
+    // Show the personal address when there is one. Every address is still matched; this only
+    // decides which one is displayed and which one an email invite would go to.
+    const shown = emails.find((e) => PERSONAL.test(e)) ?? emails[0] ?? null;
     out.push({
       id: r.id,
       name,
       initial: name.charAt(0).toUpperCase(),
       phone: mobile,
-      email: emails[0] ?? null,
+      email: shown,
       thumbnail: null,
       emails,
       emailHashes: [],
+      browsable: !looksLikeJunk(name, phones),
     });
   }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
+  // Textable people first. An invite that opens Messages gets read; one that opens Mail mostly
+  // does not, so the people you can actually reach lead the list. Alphabetical within each group.
+  return out.sort((a, b) => {
+    if (!!a.phone !== !!b.phone) return a.phone ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 type ContactsState = {
@@ -102,6 +174,10 @@ type ContactsState = {
   statuses: Record<string, FriendStatus>;
   friends: AppUser[];          // everyone you have a friendship row with
   checkAccess: () => Promise<void>;
+  /** True once the on-disk cache has been consulted, whether or not it had anything. */
+  hydrated: boolean;
+  /** Show the previous read immediately, before touching the address book again. */
+  hydrate: () => Promise<void>;
   load: (ask?: boolean) => Promise<void>;
   refreshFriends: () => Promise<void>;
   addFriend: (id: string) => Promise<FriendStatus>;
@@ -121,13 +197,35 @@ export const useContacts = create<ContactsState>((set, get) => ({
   statuses: {},
   friends: [],
   unlinked: false,
+  hydrated: false,
   checkAccess: async () => {
     // Remembered across launches, so unlinking survives a restart.
     try { if (await AsyncStorage.getItem(UNLINKED_KEY)) set({ unlinked: true }); } catch { /* ignore */ }
     set({ access: await getContactsAccess().catch(() => 'unavailable' as const) });
   },
+
+  /**
+   * Paint from the last read, immediately.
+   *
+   * The tab used to re-read the whole address book across the native bridge on every focus, then
+   * hash every address, before showing anything. This puts the previous answer on screen while
+   * the fresh read happens behind it, which is the difference between "instant" and "stuck".
+   */
+  hydrate: async () => {
+    if (get().contacts.length || get().hydrated) return;
+    try {
+      const raw = await AsyncStorage.getItem(CACHE_KEY);
+      if (!raw) { set({ hydrated: true }); return; }
+      const cached = JSON.parse(raw) as { contacts: PhoneContact[]; onApp: AppUser[] };
+      // Only if nothing arrived while we were reading from disk.
+      if (!get().contacts.length) set({ contacts: cached.contacts ?? [], onApp: cached.onApp ?? [] });
+    } catch { /* a bad cache is just a slow first paint */ }
+    set({ hydrated: true });
+  },
   load: async (ask = false) => {
     if (get().loading) return;
+    // 'loading' drives a spinner, but only when there is nothing to look at yet. A refresh
+    // behind a list that is already on screen should be silent.
     set({ loading: true, error: null });
     try {
       // Make sure people who have your email in their contacts can find you. Skipped once you
@@ -143,14 +241,17 @@ export const useContacts = create<ContactsState>((set, get) => ({
       // Render the list straight away; matching is a network round trip and can catch up.
       set({ contacts, loading: false });
 
-      const hashes = [...new Set(contacts.flatMap((c) => c.emails.map(hash)))];
+      const hashes = [...new Set(await hashAll(contacts.flatMap((c) => c.emails)))];
       const found = new Map<string, AppUser>();
       for (let i = 0; i < hashes.length; i += 2000) {
         const { data, error } = await supabase.rpc('find_contacts_on_app', { hashes: hashes.slice(i, i + 2000) });
         if (error) throw new Error(error.message);
         for (const u of (data ?? []) as AppUser[]) found.set(u.id, u);
       }
-      set({ onApp: [...found.values()].sort((a, b) => (a.name ?? a.username ?? '').localeCompare(b.name ?? b.username ?? '')) });
+      const onApp = [...found.values()].sort((a, b) => (a.name ?? a.username ?? '').localeCompare(b.name ?? b.username ?? ''));
+      set({ onApp });
+      // Next time this tab opens, it opens on this.
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ contacts, onApp })).catch(() => {});
     } catch (e) {
       console.warn('Loading contacts failed', e);
       set({ error: e instanceof Error ? e.message : String(e) });
@@ -181,13 +282,22 @@ export const useContacts = create<ContactsState>((set, get) => ({
   unlink: async () => {
     const { error } = await supabase.rpc('unlink_my_contacts');
     if (error) throw new Error(error.message);
+    // Now that the last read is cached on disk, forgetting has to reach that too, or the
+    // promise on the Contacts screen would be false the moment the app restarted.
+    AsyncStorage.multiRemove([CACHE_KEY, HASH_KEY]).catch(() => {});
+    memo.clear();
     // The address book copy lives only in this store, so dropping it is the whole of the
     // on-device half. The operating system permission is the person's to revoke, in Settings.
     set({ contacts: [], onApp: [], unlinked: true });
     await AsyncStorage.setItem(UNLINKED_KEY, '1').catch(() => {});
   },
 
-  reset: () => set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [] }),
+  reset: () => {
+    // onApp is about this account, not this phone: leaving it cached would show the next person
+    // to sign in on this handset a flash of the previous person's matches.
+    AsyncStorage.removeItem(CACHE_KEY).catch(() => {});
+    set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], hydrated: false });
+  },
 }));
 
 /** Find someone by their exact @username (for adding a friend who isn't in your contacts). */

@@ -110,3 +110,25 @@ export async function friendsOf(id: string): Promise<FriendOf[]> {
   if (error) return [];
   return (data ?? []) as FriendOf[];
 }
+
+export type ProfileStats = { friends: number; near_misses: number; mutuals: number };
+
+/**
+ * The numbers under someone's name.
+ *
+ * The friend count is their real total. How many of those you can actually see is a different
+ * question, answered by friendsOf: friends see everyone, others see only who you both know. So
+ * a stranger can see "14 friends" above a list of 2, which is honest about what exists and what
+ * is theirs to share.
+ */
+export async function profileStats(id: string): Promise<ProfileStats | null> {
+  const { data, error } = await supabase.rpc('profile_stats', { uid: id });
+  if (error) return null;
+  const rows = (data ?? []) as ProfileStats[];
+  if (!rows[0]) return null;
+  return {
+    friends: Number(rows[0].friends ?? 0),
+    near_misses: Number(rows[0].near_misses ?? 0),
+    mutuals: Number(rows[0].mutuals ?? 0),
+  };
+}

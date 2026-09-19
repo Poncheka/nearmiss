@@ -62,6 +62,8 @@ function RootNavigator() {
         <Stack.Screen name="that-day/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="photo/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="friend/[id]" />
+        <Stack.Screen name="friends/[id]" />
+        <Stack.Screen name="edit-profile" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         {/* Opened from the You tab only */}
         <Stack.Screen name="settings" />

@@ -20,7 +20,7 @@ function UserAvatar({ id, name, url, size = 44 }: { id: string; name: string; ur
 
 // Sample-data mode (no account): the old demo people.
 const demoOnApp: AppUser[] = contactsOnApp.map((id) => ({ id, username: people[id].handle.slice(1), name: people[id].fullName, avatar_url: null }));
-const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name: c.name, initial: c.initial, phone: null, email: null, thumbnail: null, emails: [], emailHashes: [] }));
+const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name: c.name, initial: c.initial, phone: null, email: null, thumbnail: null, emails: [], emailHashes: [], browsable: true }));
 
 type Row = { kind: 'user'; user: AppUser } | { kind: 'contact'; contact: PhoneContact };
 
@@ -35,6 +35,8 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
 
   useEffect(() => {
     if (demo) return;
+    // The cached read goes up first; the live read replaces it when it arrives.
+    useContacts.getState().hydrate();
     useContacts.getState().checkAccess().then(() => {
       const { access, loading } = useContacts.getState();
       if ((access === 'granted' || access === 'limited') && !loading) useContacts.getState().load();
@@ -80,7 +82,11 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
       .filter((u) => (query ? true : statuses[u.id] !== 'friends'))
       .filter((u) => match(`${u.name ?? ''} ${u.username ?? ''}`))
       .sort((a, b) => rank(statuses[a.id]) - rank(statuses[b.id]));
-    const contactRows = (demo ? demoContacts : c.contacts).filter((p) => match(`${p.name} ${p.phone ?? ''} ${p.email ?? ''}`));
+    // Shortcodes and nameless rows are dropped from browsing but stay findable: a search for
+    // something specific should still turn them up.
+    const contactRows = (demo ? demoContacts : c.contacts)
+      .filter((p) => (query ? true : p.browsable))
+      .filter((p) => match(`${p.name} ${p.phone ?? ''} ${p.email ?? ''}`));
     const out: { key: string; title: string; data: Row[] }[] = [];
     if (userRows.length) out.push({ key: 'users', title: 'On Near Miss', data: userRows.map((user) => ({ kind: 'user', user })) });
     if (contactRows.length) out.push({ key: 'contacts', title: 'Invite from your contacts', data: contactRows.map((contact) => ({ kind: 'contact', contact })) });
@@ -205,9 +211,16 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
         initialNumToRender={20}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
         renderSectionHeader={({ section }) => <SectionLabel>{section.title}</SectionLabel>}
-        ListEmptyComponent={query ? (
-          <Body size={16} color={colors.muted} style={{ textAlign: 'center', paddingVertical: 40 }}>No one matches "{q}".</Body>
-        ) : null}
+        ListEmptyComponent={
+          c.loading && !c.contacts.length ? (
+            <View style={{ paddingVertical: 48, alignItems: 'center', gap: 12 }}>
+              <ActivityIndicator color={colors.violet} />
+              <Body size={14} color={colors.muted}>Looking through your contacts…</Body>
+            </View>
+          ) : query ? (
+            <Body size={16} color={colors.muted} style={{ textAlign: 'center', paddingVertical: 40 }}>No one matches "{q}".</Body>
+          ) : null
+        }
         renderItem={({ item, index, section }) => {
           const last = index === section.data.length - 1;
           const rowStyle = {

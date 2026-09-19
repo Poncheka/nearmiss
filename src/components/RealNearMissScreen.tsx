@@ -24,9 +24,11 @@ type Entry =
   | { kind: 'text'; id: string; at: string; mine: boolean; body: string }
   | { kind: 'photo'; id: string; at: string; mine: boolean; photo: SharedPhoto };
 
-const FEEDBACK: { kind: 'together' | 'not_interesting'; label: string }[] = [
+// "Not interesting" was a shrug with no follow-up: it hid the near miss and taught us nothing,
+// and on a screen whose whole job is to say "this moment mattered" it read as an invitation to
+// dismiss it. "We were together" is the one that carries information worth having.
+const FEEDBACK: { kind: 'together'; label: string }[] = [
   { kind: 'together', label: 'We were together' },
-  { kind: 'not_interesting', label: 'Not interesting' },
 ];
 
 export function RealNearMissScreen({ id }: { id: string }) {
@@ -124,7 +126,7 @@ export function RealNearMissScreen({ id }: { id: string }) {
     },
   ]);
 
-  const feedback = (kind: 'together' | 'not_interesting', label: string) => Alert.alert(label, 'This near miss will be hidden from your feed.', [
+  const feedback = (kind: 'together', label: string) => Alert.alert(label, 'This near miss will be hidden from your feed.', [
     { text: 'Cancel', style: 'cancel' },
     {
       text: 'Hide it', onPress: async () => {
@@ -207,6 +209,9 @@ export function RealNearMissScreen({ id }: { id: string }) {
             onUnshare={unshare}
           />
 
+          {/* Front and centre, with that night's photos already loaded. */}
+          <ShareFromThatNight nm={nm} name={name} theyShared={(photos ?? []).some((p) => !p.mine)} />
+
           {/* The photos live in the gallery above, where they are the first thing you see, and
               they appear here too, in the order everything actually happened. A photo sent
               between two messages is part of the conversation, and pulling it out left replies
@@ -265,8 +270,6 @@ export function RealNearMissScreen({ id }: { id: string }) {
             })}
           </View>
 
-          {/* Front and centre, with that night's photos already loaded. */}
-          <ShareFromThatNight nm={nm} name={name} theyShared={(photos ?? []).some((p) => !p.mine)} />
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 8 }}>
             {FEEDBACK.map((f) => <Pill key={f.kind} label={f.label} variant="white" height={36} textSize={14} onPress={() => feedback(f.kind, f.label)} />)}

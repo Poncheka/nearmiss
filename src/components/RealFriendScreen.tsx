@@ -4,18 +4,17 @@ import { ActivityIndicator, Alert, Image, Pressable, ScrollView, useWindowDimens
 import { router, useFocusEffect } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react-native';
 import { Avatar } from '@/components/avatar';
-import { Body, Card, Chip, Display, Divider, IconButton, Screen, SectionLabel } from '@/components/ui';
+import { Body, Card, Chip, Display, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
 import { NearMissCard } from '@/components/NearMissCard';
 import { useAuth } from '@/lib/auth';
-import { blockUser, FriendOf, friendsOf, PublicProfile, publicProfile, unfriend } from '@/lib/relationships';
+import { blockUser, FriendOf, friendsOf, ProfileStats, profileStats, PublicProfile, publicProfile, unfriend } from '@/lib/relationships';
 import { colors, pastel, radius } from '@/theme';
 
 export function RealFriendScreen({ id }: { id: string }) {
   const friend = useContacts((s) => s.friends.find((f) => f.id === id));
   const status = useContacts((s) => s.statuses[id]);
-  const statuses = useContacts((s) => s.statuses);
   const items = useNearMisses((s) => s.items);
   const needsMet = useNearMisses((s) => s.needsMetOn.find((n) => n.friend_id === id));
   const { profile } = useAuth();
@@ -39,6 +38,7 @@ export function RealFriendScreen({ id }: { id: string }) {
   // the server for the four public fields instead.
   const [stranger, setStranger] = useState<PublicProfile | null>(null);
   const [circle, setCircle] = useState<FriendOf[] | null>(null);
+  const [stats, setStats] = useState<ProfileStats | null>(null);
   const [adding, setAdding] = useState(false);
 
   // You can land here from a near miss with someone who isn't in your friends list, which is
@@ -63,6 +63,7 @@ export function RealFriendScreen({ id }: { id: string }) {
   useEffect(() => {
     let live = true;
     friendsOf(id).then((f) => { if (live) setCircle(f); }).catch(() => { if (live) setCircle([]); });
+    profileStats(id).then((st) => { if (live) setStats(st); }).catch(() => {});
     return () => { live = false; };
   }, [id]);
 
@@ -112,14 +113,6 @@ export function RealFriendScreen({ id }: { id: string }) {
       Alert.alert("Couldn't send that", e instanceof Error ? e.message : String(e));
     } finally {
       setAdding(false);
-    }
-  };
-
-  const addSomeone = async (who: string, label: string) => {
-    try {
-      await useContacts.getState().addFriend(who);
-    } catch (e) {
-      Alert.alert(`Couldn't add ${label}`, e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -173,11 +166,31 @@ export function RealFriendScreen({ id }: { id: string }) {
                   </Body>
                 </Pressable>
           ) : null}
-          <Body size={15} color={colors.text2} style={{ paddingTop: 6 }}>
-            {misses.length === 0
-              ? 'No near misses yet'
-              : `${misses.length} near ${misses.length === 1 ? 'miss' : 'misses'}${before.length ? ` · ${before.length} before you met` : ''}`}
-          </Body>
+          {/* Their friend count is their real total. How many of them you can see is a separate
+              question, which the friends page answers honestly. */}
+          <View style={{ flexDirection: 'row', gap: 24, paddingTop: 10 }}>
+            <Pressable
+              accessibilityLabel={`See ${name}'s friends`}
+              onPress={() => router.push({ pathname: '/friends/[id]', params: { id } })}
+              style={{ alignItems: 'center', minWidth: 76 }}
+            >
+              <Display size={22}>{(stats?.friends ?? 0).toLocaleString('en-US')}</Display>
+              <Body size={13} color={colors.violet}>{stats?.friends === 1 ? 'friend' : 'friends'}</Body>
+            </Pressable>
+            <View style={{ alignItems: 'center', minWidth: 76 }}>
+              <Display size={22}>{misses.length.toLocaleString('en-US')}</Display>
+              <Body size={13} color={colors.muted}>{misses.length === 1 ? 'near miss' : 'near misses'}</Body>
+            </View>
+            {stats && stats.mutuals > 0 ? (
+              <View style={{ alignItems: 'center', minWidth: 76 }}>
+                <Display size={22}>{stats.mutuals.toLocaleString('en-US')}</Display>
+                <Body size={13} color={colors.muted}>in common</Body>
+              </View>
+            ) : null}
+          </View>
+          {before.length > 0 ? (
+            <Body size={14} color={colors.muted}>{before.length} before you met</Body>
+          ) : null}
         </Card>
 
         {/* Set it or change it later — the feed asks once, this is where you correct it. */}
@@ -198,51 +211,29 @@ export function RealFriendScreen({ id }: { id: string }) {
           </Pressable>
         )}
 
-        {/* Who they know. Friends see the whole list; everyone else sees only the overlap, and
-            the heading says which, because "Friends" over a filtered list is a lie. */}
         {circle && circle.length > 0 ? (
-          <View style={{ gap: 10 }}>
-            <SectionLabel>
-              {circle[0].scope === 'all'
-                ? `${name}'s friends`
-                : `You both know${circle.length > 1 ? ` (${circle.length})` : ''}`}
-            </SectionLabel>
-            <Card style={{ paddingHorizontal: 16, paddingVertical: 2 }}>
-              {circle.map((f, i) => {
-                const who = f.name || (f.username ? `@${f.username}` : 'Someone');
-                const theirStatus = statuses[f.user_id];
-                return (
-                  <View key={f.user_id}>
-                    <Pressable
-                      accessibilityLabel={`Open ${who}'s profile`}
-                      onPress={() => router.push({ pathname: '/friend/[id]', params: { id: f.user_id } })}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}
-                    >
-                      {f.avatar_url
-                        ? <Image source={{ uri: f.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                        : <Avatar initial={who.replace('@', '').charAt(0).toUpperCase()} color={pastel.lilac} size={40} />}
-                      <View style={{ flex: 1 }}>
-                        <Body size={16} weight="semibold" numberOfLines={1}>{who}</Body>
-                        {f.username ? <Body size={13} color={colors.muted}>@{f.username}</Body> : null}
-                      </View>
-                      {theirStatus === 'friends' ? <Chip label="Friends" tone="sand" />
-                        : theirStatus === 'requested' ? <Chip label="Requested" tone="sand" />
-                        : <Pressable
-                            accessibilityLabel={`Add ${who}`}
-                            onPress={() => addSomeone(f.user_id, who)}
-                            style={{ minHeight: 34, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.violetTint, alignItems: 'center', justifyContent: 'center' }}
-                          >
-                            <Body size={14} weight="bold" color={colors.violet}>
-                              {theirStatus === 'incoming' ? 'Accept' : 'Add'}
-                            </Body>
-                          </Pressable>}
-                    </Pressable>
-                    {i < circle.length - 1 && <Divider />}
+          <Pressable onPress={() => router.push({ pathname: '/friends/[id]', params: { id } })}>
+            <Card style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ flexDirection: 'row' }}>
+                {circle.slice(0, 3).map((f, i) => (
+                  <View key={f.user_id} style={{ marginLeft: i === 0 ? 0 : -12 }}>
+                    {f.avatar_url
+                      ? <Image source={{ uri: f.avatar_url }} style={{ width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: colors.white }} />
+                      : <Avatar initial={(f.name || f.username || '?').replace('@', '').charAt(0).toUpperCase()} color={pastel.lilac} size={34} ring />}
                   </View>
-                );
-              })}
+                ))}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Body size={16} weight="semibold">
+                  {circle[0].scope === 'all' ? `${name}'s friends` : 'People you both know'}
+                </Body>
+                <Body size={14} color={colors.muted}>
+                  {circle.length} {circle.length === 1 ? 'person' : 'people'} you can add
+                </Body>
+              </View>
+              <ChevronRight size={18} color={colors.faint} />
             </Card>
-          </View>
+          </Pressable>
         ) : null}
 
         {before.length > 0 && <Section title="Before you met" list={before} />}

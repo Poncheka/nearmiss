@@ -6,8 +6,8 @@
 //
 // The reactions sit under the photo rather than over it, because a heart floating on top of
 // someone's picture from 2019 covers the thing you came to look at.
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, PanResponder, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +36,34 @@ export default function PhotoViewer() {
   const start = Math.min(Math.max(Number(index ?? 0) || 0, 0), Math.max(photos.length - 1, 0));
   const [page, setPage] = useState(start);
   const pager = useRef<ScrollView>(null);
+
+  // Flick down to leave, the way every photo viewer works. PanResponder rather than a gesture
+  // library, because the library would be a native dependency and this ships over the air.
+  //
+  // The responder only claims a gesture that is clearly downward, so the horizontal pager still
+  // gets its swipes, and only while the photo is unzoomed, so panning around a zoomed picture is
+  // never mistaken for a dismissal.
+  const drag = useRef(new Animated.Value(0)).current;
+  const zoomed = useRef(false);
+  const pan = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_e, g) =>
+      !zoomed.current && g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.6,
+    onPanResponderMove: (_e, g) => { if (g.dy > 0) drag.setValue(g.dy); },
+    onPanResponderRelease: (_e, g) => {
+      if (g.dy > 120 || g.vy > 0.8) {
+        Animated.timing(drag, { toValue: 900, duration: 180, useNativeDriver: true })
+          .start(() => (router.canGoBack() ? router.back() : router.replace('/')));
+      } else {
+        Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+      }
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(drag, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+    },
+  }), [drag]);
+
+  // The backdrop thins out as you pull, so the gesture feels like lifting the photo off the page.
+  const backdrop = drag.interpolate({ inputRange: [0, 300], outputRange: [1, 0.2], extrapolate: 'clamp' });
 
   // The pager can't be told where to start until it has been laid out once.
   useEffect(() => {
@@ -93,9 +121,11 @@ export default function PhotoViewer() {
     : '';
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink }}>
+    <View style={{ flex: 1 }} {...pan.panHandlers}>
       <StatusBar style="light" />
+      <Animated.View style={{ position: 'absolute', inset: 0, backgroundColor: colors.ink, opacity: backdrop }} />
 
+      <Animated.View style={{ flex: 1, transform: [{ translateY: drag }] }}>
       <ScrollView
         ref={pager}
         horizontal
@@ -124,6 +154,8 @@ export default function PhotoViewer() {
                 centerContent
                 showsHorizontalScrollIndicator={false}
                 showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={(e) => { zoomed.current = e.nativeEvent.zoomScale > 1.01; }}
                 contentContainerStyle={{ width, height: frameHeight, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Image
@@ -177,6 +209,7 @@ export default function PhotoViewer() {
           />
         </View>
       ) : null}
+      </Animated.View>
     </View>
   );
 }

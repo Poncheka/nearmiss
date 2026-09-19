@@ -31,14 +31,19 @@ function Stat({ n, label }: { n: number; label: string }) {
   );
 }
 
-/** Sits with the counts, so dismissing the card never loses the link. */
+/**
+ * Sits with the counts, so dismissing the card never loses the link.
+ *
+ * The icon occupies a box the same height as a Display 22 number (its line box, 23pt) so the
+ * icon and the counts share a baseline and the three labels underneath line up.
+ */
 function InviteStat({ onPress }: { onPress: () => void }) {
   return (
     <Pressable accessibilityLabel="Invite friends" onPress={onPress} style={{ alignItems: 'center', minWidth: 76 }}>
-      <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.violetTint, alignItems: 'center', justifyContent: 'center' }}>
-        <UserPlus size={17} color={colors.violet} strokeWidth={2.2} />
+      <View style={{ height: 23, alignItems: 'center', justifyContent: 'center' }}>
+        <UserPlus size={21} color={colors.violet} strokeWidth={2.4} />
       </View>
-      <Body size={13} weight="semibold" color={colors.violet} style={{ paddingTop: 1 }}>invite</Body>
+      <Body size={13} color={colors.violet}>invite</Body>
     </Pressable>
   );
 }
@@ -124,6 +129,14 @@ export default function You() {
             <Body size={15} color={colors.muted}>@{profile?.username}</Body>
             {profile?.bio ? <Body size={15} color={colors.text2} style={{ textAlign: 'center', paddingTop: 4 }}>{profile.bio}</Body> : null}
           </View>
+          <Pressable
+            accessibilityLabel="Edit your profile"
+            onPress={() => router.push('/edit-profile')}
+            style={{ minHeight: 36, paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center', marginTop: 4 }}
+          >
+            <Body size={15} weight="semibold">Edit profile</Body>
+          </Pressable>
+
           <View style={{ flexDirection: 'row', gap: 24, paddingTop: 8 }}>
             <Stat n={friends.length} label={friends.length === 1 ? 'friend' : 'friends'} />
             <Stat n={items.length} label={items.length === 1 ? 'near miss' : 'near misses'} />
