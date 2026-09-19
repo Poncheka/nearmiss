@@ -25,8 +25,16 @@ export function ShareFromThatNight({ nm, name, theyShared }: { nm: RealNearMiss;
   const busy = useSharedPhotos((s) => !!s.busy[nm.id]);
   // Anything already on this near miss drops out of the strip, so the same photo can't be sent
   // twice and pile up in the carousel.
-  const alreadyShared = useSharedPhotos((s) =>
-    new Set((s.byNearMiss[nm.id] ?? []).map((p) => p.asset_id).filter(Boolean) as string[]));
+  //
+  // The selector returns the stored array itself and the Set is built here. Building it inside
+  // the selector crashed the app: zustand v5 compares snapshots with Object.is, and a fresh Set
+  // every read is never equal to the last one, so React re-rendered forever. In a release build
+  // that is not a warning, it is the app closing.
+  const shared = useSharedPhotos((s) => s.byNearMiss[nm.id]);
+  const alreadyShared = useMemo(
+    () => new Set((shared ?? []).map((p) => p.asset_id).filter(Boolean) as string[]),
+    [shared],
+  );
   const [shots, setShots] = useState<LocalShot[] | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   // Shared in this session: dropped from the strip so it doesn't offer the same photo twice.

@@ -20,12 +20,17 @@ import { SharedPhoto, useSharedPhotos } from '@/lib/sharedPhotos';
 import { useReactions } from '@/lib/reactions';
 import { colors } from '@/theme';
 
+/** One shared empty array, so the selector below always hands back the same reference. */
+const NONE: SharedPhoto[] = [];
+
 export default function PhotoViewer() {
   const { id, index } = useLocalSearchParams<{ id: string; index?: string }>();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const nm = useNearMisses((s) => s.items.find((x) => x.id === id));
-  const photos = useSharedPhotos((s) => (id ? s.byNearMiss[id] ?? [] : []));
+  // NONE rather than a fresh [], for the reason spelled out in ShareFromThatNight: a selector
+  // that builds a new value every read never compares equal, and React spins.
+  const photos = useSharedPhotos((s) => (id ? s.byNearMiss[id] ?? NONE : NONE));
   const reactions = useReactions((s) => (id ? s.byNearMiss[id] : undefined));
 
   const start = Math.min(Math.max(Number(index ?? 0) || 0, 0), Math.max(photos.length - 1, 0));
