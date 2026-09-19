@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Body, Card, Divider, IconButton, Screen, SectionLabel, TextLink, Toggle } from '@/components/ui';
 import { Settings, useAuth } from '@/lib/auth';
@@ -28,6 +30,33 @@ const notifOptions: { id: NotifKey; label: string; sub: string }[] = [
   { id: 'notify_weekly_report', label: 'Weekly report', sub: 'New near misses from friends who joined, every Sunday' },
   { id: 'notify_on_this_day', label: 'On this day', sub: 'Anniversaries of old near misses' },
 ];
+
+/**
+ * Which version is actually on this phone.
+ *
+ * Worth a line of its own: without it, "I'm not seeing the new thing" and "the new thing is
+ * broken" look identical, and the only way to tell them apart was to go and read the build logs.
+ * Shows the app version, and separately whether an over-the-air update has been applied on top,
+ * because those move independently.
+ */
+function VersionRow() {
+  const version = (Constants.expoConfig?.version as string | undefined) ?? '?';
+  const onUpdate = !__DEV__ && Updates.isEnabled && !Updates.isEmbeddedLaunch;
+  const when = Updates.createdAt
+    ? new Date(Updates.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : null;
+
+  return (
+    <View style={{ alignItems: 'center', paddingTop: 22, gap: 2 }}>
+      <Body size={13} color={colors.faint}>Near Miss {version}</Body>
+      <Body size={12} color={colors.faint}>
+        {__DEV__ ? 'Development'
+          : onUpdate ? `Updated${when ? ` ${when}` : ''}`
+          : 'As installed'}
+      </Body>
+    </View>
+  );
+}
 
 function Group({ children }: { children: React.ReactNode }) {
   return <Card style={{ paddingHorizontal: 16, paddingVertical: 2 }}>{children}</Card>;
@@ -330,6 +359,8 @@ export default function SettingsScreen() {
           <Row><TextLink label={demo ? 'Leave sample data' : 'Sign out'} color={colors.ink} onPress={confirmSignOut} /></Row>
           <Row last><TextLink label="Delete my account" color={colors.danger} onPress={() => router.push('/delete-account')} /></Row>
         </Group>
+
+        <VersionRow />
       </ScrollView>
     </Screen>
   );
