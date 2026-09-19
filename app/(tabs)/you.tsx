@@ -1,9 +1,10 @@
 // Your profile: who you are, and who you're connected to. Everything you configure rather
 // than look at now lives behind the gear, in app/settings.tsx.
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronRight, Settings as SettingsIcon, UserPlus } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Body, Card, Display, Screen, SectionLabel } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { AvatarPicker } from '@/components/AvatarPicker';
@@ -19,12 +20,26 @@ const colorFor = (key: string) => PASTELS[[...key].reduce((n, ch) => n + ch.char
 
 const firstName = (u: AppUser) => u.name?.split(' ')[0] || (u.username ? `@${u.username}` : 'Friend');
 
+const INVITE_HIDDEN = 'nearmiss.you.inviteHidden';
+
 function Stat({ n, label }: { n: number; label: string }) {
   return (
     <View style={{ alignItems: 'center', minWidth: 76 }}>
       <Display size={22}>{n.toLocaleString('en-US')}</Display>
       <Body size={13} color={colors.muted}>{label}</Body>
     </View>
+  );
+}
+
+/** Sits with the counts, so dismissing the card never loses the link. */
+function InviteStat({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable accessibilityLabel="Invite friends" onPress={onPress} style={{ alignItems: 'center', minWidth: 76 }}>
+      <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.violetTint, alignItems: 'center', justifyContent: 'center' }}>
+        <UserPlus size={17} color={colors.violet} strokeWidth={2.2} />
+      </View>
+      <Body size={13} weight="semibold" color={colors.violet} style={{ paddingTop: 1 }}>invite</Body>
+    </Pressable>
   );
 }
 
@@ -70,6 +85,21 @@ export default function You() {
     return m;
   }, [items]);
 
+  // Whether the invite card is hidden. Kept on the phone rather than the server: it is a
+  // preference about this screen, not a fact about the account, and losing it is harmless.
+  const [hidden, setHidden] = useState<boolean | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem(INVITE_HIDDEN).then((v) => setHidden(v === '1')).catch(() => setHidden(false));
+  }, []);
+  const hideInvite = () => {
+    setHidden(true);
+    AsyncStorage.setItem(INVITE_HIDDEN, '1').catch(() => {});
+  };
+  const showInvite = () => {
+    setHidden(false);
+    AsyncStorage.removeItem(INVITE_HIDDEN).catch(() => {});
+  };
+
   return (
     <Screen>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -97,10 +127,11 @@ export default function You() {
           <View style={{ flexDirection: 'row', gap: 24, paddingTop: 8 }}>
             <Stat n={friends.length} label={friends.length === 1 ? 'friend' : 'friends'} />
             <Stat n={items.length} label={items.length === 1 ? 'near miss' : 'near misses'} />
+            {hidden ? <InviteStat onPress={showInvite} /> : null}
           </View>
         </Card>
 
-        <InviteLink username={profile?.username} />
+        {hidden === false ? <InviteLink username={profile?.username} onDismiss={hideInvite} /> : null}
 
         <View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
