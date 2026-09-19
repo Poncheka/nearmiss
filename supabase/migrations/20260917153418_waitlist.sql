@@ -10,3 +10,4 @@ alter table public.waitlist enable row level security;
 create policy "anyone can join the waitlist" on public.waitlist
   for insert to anon, authenticated with check (true);
 grant insert on public.waitlist to anon, authenticated;
+;

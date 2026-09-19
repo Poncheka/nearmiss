@@ -237,4 +237,4 @@ language sql stable security definer set search_path = '' as $$
   order by m.closest_at;
 $$;
 revoke execute on function public.my_near_misses() from public, anon;
-grant execute on function public.my_near_misses() to authenticated;
+grant execute on function public.my_near_misses() to authenticated;;

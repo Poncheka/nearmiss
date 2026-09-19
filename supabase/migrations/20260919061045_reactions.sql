@@ -5,7 +5,8 @@
 -- person to have said something without having to write it.
 --
 -- Everything is scoped to the near miss so the policies can reuse the participant check that
--- already guards the comments and the photos.
+-- already guards the comments and the photos. There is no path to react to something on a near
+-- miss you are not part of.
 
 create table if not exists public.reactions (
   id uuid primary key default gen_random_uuid(),
@@ -46,7 +47,8 @@ create policy reactions_remove on public.reactions
   using (user_id = (select auth.uid()));
 
 -- One call for all three outcomes: add it, swap it, or take it back by tapping the same one.
--- Returns the emoji that is now yours, or null if you removed it.
+-- Returns the emoji that is now yours, or null if you removed it, so the client doesn't have to
+-- guess which of the three happened.
 create or replace function public.react(
   nm_id uuid, t_type text, t_id uuid, e text
 ) returns text
@@ -66,7 +68,7 @@ begin
   -- The target has to actually sit on this near miss, or a reaction could be filed against
   -- someone else's photo by passing its id here.
   if t_type = 'comment' then
-    if not exists (select 1 from public.comments c
+    if not exists (select 1 from public.near_miss_comments c
                     where c.id = t_id and c.near_miss_id = nm_id) then
       raise exception 'No such message';
     end if;
@@ -109,62 +111,4 @@ language sql stable security definer set search_path = '' as $$
    order by r.created_at;
 $$;
 revoke execute on function public.near_miss_reactions(uuid) from public, anon;
-grant execute on function public.near_miss_reactions(uuid) to authenticated;
-
--- Tell the other person, but only the first time. Changing your mind from a heart to a laugh
--- is an update, not an insert, so it never pings them again.
-alter table public.activity drop constraint if exists activity_type_check;
-alter table public.activity add constraint activity_type_check check (type = any (array[
-  'comment', 'friend_request', 'friend_accepted', 'near_miss', 'photo_shared', 'reply',
-  'friend_joined', 'invite_joined', 'met_changed', 'fof_near_miss', 'weekly_report',
-  'on_this_day', 'reaction'
-]));
-
-create or replace function private.on_reaction_activity()
-returns trigger
-language plpgsql security definer set search_path = '' as $$
-declare
-  owner uuid;
-begin
-  -- Whoever made the thing being reacted to, which is not always the other person: you can
-  -- react to your own photo, and nobody needs telling about that.
-  if new.target_type = 'comment' then
-    select c.author_id into owner from public.comments c where c.id = new.target_id;
-  else
-    select s.owner_id into owner from public.shared_photos s where s.id = new.target_id;
-  end if;
-
-  if owner is null or owner = new.user_id then return null; end if;
-
-  insert into public.activity (user_id, actor_id, type, near_miss_id, payload)
-  values (owner, new.user_id, 'reaction', new.near_miss_id,
-          jsonb_build_object('emoji', new.emoji, 'target', new.target_type));
-  return null;
-end $$;
-
-drop trigger if exists reactions_activity on public.reactions;
-create trigger reactions_activity
-  after insert on public.reactions
-  for each row execute function private.on_reaction_activity();
-
--- A reaction's payload holds the emoji, not a body, and the activity list only reads 'body'.
-create or replace function public.my_activity(limit_n int default 50)
-returns table (
-  id uuid, type text, actor_id uuid, actor_name text, actor_username text, actor_avatar_url text,
-  near_miss_id uuid, place_name text, night date, body text,
-  created_at timestamptz, read_at timestamptz
-)
-language sql stable security definer set search_path = '' as $$
-  select a.id, a.type, a.actor_id, p.name, p.username::text, p.avatar_url,
-         a.near_miss_id, nm.place_name, nm.night,
-         coalesce(a.payload->>'body', a.payload->>'emoji'),
-         a.created_at, a.read_at
-  from public.activity a
-  left join public.profiles p on p.id = a.actor_id
-  left join public.near_misses nm on nm.id = a.near_miss_id
-  where a.user_id = (select auth.uid())
-  order by a.created_at desc
-  limit least(greatest(limit_n, 1), 200);
-$$;
-revoke execute on function public.my_activity(int) from public, anon;
-grant execute on function public.my_activity(int) to authenticated;
+grant execute on function public.near_miss_reactions(uuid) to authenticated;;

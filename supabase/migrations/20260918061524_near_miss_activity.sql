@@ -1,8 +1,3 @@
--- Tell people when new near misses turn up.
---
--- Carefully: matching a new friend produced 39 rows at once for the first real pair. Nobody
--- wants 39 notifications. One row per pair per half-day, and the app says "new near misses"
--- rather than naming one, so the count can't go stale.
 create or replace function private.on_near_miss_activity()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -10,7 +5,6 @@ declare
   target uuid;
   actor uuid;
 begin
-  -- Only worth telling someone about once it is actually visible to them.
   if new.visible_after > now() then return null; end if;
 
   foreach target in array array[new.user_a, new.user_b] loop
@@ -33,4 +27,4 @@ end $$;
 drop trigger if exists near_misses_activity on public.near_misses;
 create trigger near_misses_activity
   after insert on public.near_misses
-  for each row execute function private.on_near_miss_activity();
+  for each row execute function private.on_near_miss_activity();;

@@ -270,3 +270,4 @@ begin
   return total;
 end $$;
 revoke execute on function private.match_everyone() from public, anon, authenticated;
+;

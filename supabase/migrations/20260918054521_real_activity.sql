@@ -1,22 +1,12 @@
--- The activity table has been sitting empty: RLS was set up, but nothing ever wrote a row,
--- so the Activity screen has been showing mock data. These triggers fill it.
---
--- Nobody can insert directly (there is no insert policy on purpose). Only these
--- security-definer triggers write, so an activity row is always something that really happened.
-
--- Someone asked to be your friend, or accepted your request.
 create or replace function private.on_friendship_activity()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if tg_op = 'INSERT' and new.status = 'pending' then
-    -- tell whoever did not send it
     insert into public.activity (user_id, actor_id, type)
     values (case when new.requested_by = new.user_a then new.user_b else new.user_a end,
             new.requested_by, 'friend_request');
-
   elsif tg_op = 'UPDATE' and new.status = 'accepted' and old.status is distinct from 'accepted' then
-    -- tell whoever asked first; the accepter is the other one
     insert into public.activity (user_id, actor_id, type)
     values (new.requested_by,
             case when new.requested_by = new.user_a then new.user_b else new.user_a end,
@@ -30,7 +20,6 @@ create trigger friendships_activity
   after insert or update on public.friendships
   for each row execute function private.on_friendship_activity();
 
--- Someone said something on a near miss you are part of.
 create or replace function private.on_comment_activity()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -54,21 +43,11 @@ create trigger comments_activity
   after insert on public.comments
   for each row execute function private.on_comment_activity();
 
--- Everything in your Activity screen, newest first.
 create or replace function public.my_activity(limit_n int default 100)
 returns table (
-  id uuid,
-  type text,
-  actor_id uuid,
-  actor_name text,
-  actor_username text,
-  actor_avatar_url text,
-  near_miss_id uuid,
-  place_name text,
-  night date,
-  body text,
-  created_at timestamptz,
-  read_at timestamptz
+  id uuid, type text, actor_id uuid, actor_name text, actor_username text, actor_avatar_url text,
+  near_miss_id uuid, place_name text, night date, body text,
+  created_at timestamptz, read_at timestamptz
 )
 language sql stable security definer set search_path = '' as $$
   select a.id, a.type, a.actor_id, p.name, p.username::text, p.avatar_url,
@@ -85,7 +64,6 @@ $$;
 revoke execute on function public.my_activity(int) from public, anon;
 grant execute on function public.my_activity(int) to authenticated;
 
--- For the dot on the bell.
 create or replace function public.my_unread_activity()
 returns int
 language sql stable security definer set search_path = '' as $$
@@ -105,4 +83,4 @@ revoke execute on function public.mark_activity_read() from public, anon;
 grant execute on function public.mark_activity_read() to authenticated;
 
 create index if not exists activity_user_created_idx on public.activity (user_id, created_at desc);
-create index if not exists activity_user_unread_idx on public.activity (user_id) where read_at is null;
+create index if not exists activity_user_unread_idx on public.activity (user_id) where read_at is null;;

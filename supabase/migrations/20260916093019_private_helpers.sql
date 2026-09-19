@@ -48,3 +48,4 @@ create trigger on_auth_user_created after insert on auth.users
 drop function public.handle_new_user();
 
 revoke execute on function public.set_updated_at() from public, anon, authenticated;
+;

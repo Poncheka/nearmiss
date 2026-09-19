@@ -98,3 +98,4 @@ create policy "file reports" on public.reports
   for insert to authenticated with check (reporter_id = (select auth.uid()));
 create policy "see own reports" on public.reports
   for select to authenticated using (reporter_id = (select auth.uid()));
+;

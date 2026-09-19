@@ -1,19 +1,3 @@
--- "When did you two meet?"
---
--- The first real test of the app found 39 near misses between two people who have been a
--- couple since early 2026. Six were genuine — years apart, hours apart, strangers in the same
--- neighbourhood. The other 25+ were holidays they took together: Cannes, Ojai, Nashville,
--- three nights running each time, sometimes three metres apart.
---
--- No detector fixes that reliably, because two people on holiday together look exactly like
--- two people who keep barely missing each other. The person knows the answer, so ask them:
--- once we know the date they met, everything before it is the feed and everything after it
--- goes in its own section.
---
--- met_on already existed on friendships and is_before_met on near_misses. Neither was ever
--- set, which is why every near miss showed the same (missing) badge.
-
--- Either person can say when they met. It is a shared fact, so it applies to both of them.
 create or replace function public.set_met_on(friend uuid, on_date date)
 returns void
 language plpgsql security definer set search_path = '' as $$
@@ -34,7 +18,6 @@ begin
    where user_a = a and user_b = b;
   if not found then raise exception 'you are not friends'; end if;
 
-  -- Re-label what we already matched, rather than re-running the whole match for one date.
   update public.near_misses
      set is_before_met = (on_date is not null and night < on_date)
    where user_a = a and user_b = b;
@@ -42,7 +25,6 @@ end $$;
 revoke execute on function public.set_met_on(uuid, date) from public, anon;
 grant execute on function public.set_met_on(uuid, date) to authenticated;
 
--- my_friendships now says whether the date is known, so the app knows when to ask.
 drop function if exists public.my_friendships();
 create function public.my_friendships()
 returns table (
@@ -66,7 +48,6 @@ $$;
 revoke execute on function public.my_friendships() from public, anon;
 grant execute on function public.my_friendships() to authenticated;
 
--- A friend we have near misses with but no meeting date for. The app asks about these.
 create or replace function public.friendships_needing_met_on()
 returns table (friend_id uuid, name text, username text, avatar_url text, near_miss_count bigint, earliest date)
 language sql stable security definer set search_path = '' as $$
@@ -84,4 +65,4 @@ language sql stable security definer set search_path = '' as $$
   having count(n.id) > 0;
 $$;
 revoke execute on function public.friendships_needing_met_on() from public, anon;
-grant execute on function public.friendships_needing_met_on() to authenticated;
+grant execute on function public.friendships_needing_met_on() to authenticated;;

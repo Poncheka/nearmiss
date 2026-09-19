@@ -1,6 +1,5 @@
 -- Matching tuning: ignore photos that exist in both libraries entirely, and a stronger
 -- "they were together" rule (close photos over 30+ minutes or in more than one place).
--- Finds (and refreshes) near misses between two people. Returns how many nights matched.
 create or replace function private.match_pair(p uuid, q uuid)
 returns int
 language plpgsql security definer set search_path = '' as $$
@@ -109,4 +108,4 @@ begin
   return n;
 end $$;
 revoke execute on function private.match_pair(uuid, uuid) from public, anon, authenticated;
-
+;

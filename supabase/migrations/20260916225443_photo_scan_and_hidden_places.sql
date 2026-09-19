@@ -122,3 +122,4 @@ language sql security invoker set search_path = '' as $$
 $$;
 revoke execute on function public.clear_my_locations() from public, anon;
 grant execute on function public.clear_my_locations() to authenticated;
+;

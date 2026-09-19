@@ -13,3 +13,4 @@ create index if not exists reports_comment_idx on public.reports (comment_id);
 create index if not exists reports_reported_user_idx on public.reports (reported_user_id);
 create index if not exists reports_reporter_idx on public.reports (reporter_id);
 create index if not exists shared_photos_owner_idx on public.shared_photos (owner_id);
+;

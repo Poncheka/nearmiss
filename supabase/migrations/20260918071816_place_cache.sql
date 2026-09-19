@@ -17,3 +17,4 @@ comment on column public.place_cache.name is
 alter table public.place_cache enable row level security;
 
 create index if not exists place_cache_fetched_at_idx on public.place_cache (fetched_at);
+;

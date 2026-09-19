@@ -16,3 +16,4 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke execute on function public.find_user_by_username(text) from public, anon;
 grant execute on function public.find_user_by_username(text) to authenticated;
+;

@@ -1,8 +1,3 @@
--- Matching two full photo libraries takes a few seconds, and the API cuts a request off at
--- 8 seconds. So: remember what each pair looked like the last time we matched it, skip the
--- pairs that haven't changed, and stop after a time budget when someone is waiting on it.
--- Whatever doesn't fit is picked up by the nightly job.
-
 create table if not exists private.match_runs (
   user_a uuid not null references auth.users(id) on delete cascade,
   user_b uuid not null references auth.users(id) on delete cascade,
@@ -10,10 +5,8 @@ create table if not exists private.match_runs (
   matched_at timestamptz not null default now(),
   primary key (user_a, user_b)
 );
-alter table private.match_runs enable row level security;  -- no policies: only these functions touch it
+alter table private.match_runs enable row level security;
 
--- Changes whenever either person's photos or hidden places change.
--- Bump the version prefix whenever matching itself changes, to force a re-match.
 create or replace function private.pair_fingerprint(a uuid, b uuid)
 returns text
 language sql stable security definer set search_path = '' as $$
@@ -27,9 +20,6 @@ language sql stable security definer set search_path = '' as $$
   ) t;
 $$;
 
--- Matches everyone you could have a near miss with, newest change first.
--- Skips pairs whose photos haven't changed since last time.
--- max_seconds = stop starting new pairs after this long (null = no limit).
 drop function if exists private.match_user(uuid);
 create function private.match_user(uid uuid, max_seconds int default null)
 returns int
@@ -56,7 +46,6 @@ begin
     on conflict (user_a, user_b) do update set fingerprint = excluded.fingerprint, matched_at = now();
   end loop;
 
-  -- people who are no longer friends (or friends of friends) lose their near misses
   delete from public.near_misses nm
   where uid in (nm.user_a, nm.user_b)
     and (case when nm.user_a = uid then nm.user_b else nm.user_a end) not in (select other from private.match_candidates(uid));
@@ -64,8 +53,6 @@ begin
 end $$;
 revoke execute on function private.match_user(uuid, int) from public, anon, authenticated;
 
--- Adding or removing a friend just marks the pair as needing a match. The app calls
--- refresh_my_near_misses right afterwards, so nothing is done inside the friend request itself.
 create or replace function private.on_friendship_change()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -85,7 +72,6 @@ begin
   return null;
 end $$;
 
--- What the app calls after a scan or a new friend.
 create or replace function public.refresh_my_near_misses()
 returns int
 language plpgsql security definer set search_path = '' as $$
@@ -99,7 +85,6 @@ end $$;
 revoke execute on function public.refresh_my_near_misses() from public, anon;
 grant execute on function public.refresh_my_near_misses() to authenticated;
 
--- How many of your pairs still need matching (0 means the feed is up to date).
 create or replace function public.my_pending_matches()
 returns int
 language sql stable security definer set search_path = '' as $$
@@ -127,4 +112,4 @@ begin
     total := total + private.match_user(u.user_id);
   end loop;
   return total;
-end $$;
+end $$;;

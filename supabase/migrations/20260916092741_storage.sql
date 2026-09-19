@@ -35,3 +35,4 @@ create policy "view shared photos" on storage.objects
 create policy "delete own shared photo" on storage.objects
   for delete to authenticated
   using (bucket_id = 'shared-photos' and (storage.foldername(name))[2] = (select auth.uid())::text);
+;

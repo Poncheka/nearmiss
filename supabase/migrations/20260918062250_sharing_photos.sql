@@ -1,13 +1,3 @@
--- Sharing a photo from the day you nearly met.
---
--- Most of this was already designed: the shared_photos table, its policies, and the storage
--- policies on the 'shared-photos' bucket, which key off a <near_miss_id>/<owner_id>/<file>
--- path and check that you are one of the two people. Only a participant can upload, only a
--- participant can read, and you can only remove your own. That all stays.
---
--- What was missing: video, and telling the other person it happened.
-
--- Videos of the night, not just stills. 50MB covers a short clip at phone quality.
 update storage.buckets
    set allowed_mime_types = array[
          'image/jpeg', 'image/png', 'image/webp', 'image/heic',
@@ -16,7 +6,6 @@ update storage.buckets
        file_size_limit = 52428800
  where id = 'shared-photos';
 
--- "Leigh shared a photo from that night."
 create or replace function private.on_shared_photo_activity()
 returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -41,7 +30,6 @@ create trigger shared_photos_activity
   after insert on public.shared_photos
   for each row execute function private.on_shared_photo_activity();
 
--- Everything shared on one near miss, oldest first, with who shared it.
 create or replace function public.near_miss_photos(nm_id uuid)
 returns table (
   id uuid, owner_id uuid, owner_name text, owner_avatar_url text,
@@ -60,4 +48,4 @@ $$;
 revoke execute on function public.near_miss_photos(uuid) from public, anon;
 grant execute on function public.near_miss_photos(uuid) to authenticated;
 
-create index if not exists shared_photos_near_miss_idx on public.shared_photos (near_miss_id, created_at);
+create index if not exists shared_photos_near_miss_idx on public.shared_photos (near_miss_id, created_at);;

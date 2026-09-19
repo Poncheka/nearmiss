@@ -1,12 +1,3 @@
--- Guessing when two people met, so we can ask a question instead of a blank form.
---
--- Two strangers cross paths rarely and at random: months or years apart. Two people who know
--- each other turn up in the same place constantly. So the meeting date is where the rhythm
--- changes. On the first real pair in the app the gaps before were 158, 311, 193, 1345, 858
--- and 218 days; from one specific night onwards they were 1, 34, 5, 1, 12, 1, 1, 19, ...
---
--- The guess: the earliest night that has at least 3 near misses in the 90 days after it.
--- One chance encounter does not start a cluster; knowing someone does.
 create or replace function private.guess_met_on(a uuid, b uuid)
 returns date
 language sql stable security definer set search_path = '' as $$
@@ -23,7 +14,6 @@ language sql stable security definer set search_path = '' as $$
   where t.nearby >= 3;
 $$;
 
--- Hand the guess to the app alongside the friend who needs a date.
 drop function if exists public.friendships_needing_met_on();
 create function public.friendships_needing_met_on()
 returns table (
@@ -46,4 +36,4 @@ language sql stable security definer set search_path = '' as $$
   having count(n.id) > 0;
 $$;
 revoke execute on function public.friendships_needing_met_on() from public, anon;
-grant execute on function public.friendships_needing_met_on() to authenticated;
+grant execute on function public.friendships_needing_met_on() to authenticated;;

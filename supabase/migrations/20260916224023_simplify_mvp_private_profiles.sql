@@ -47,7 +47,6 @@ create policy "see own, friends and near-miss profiles" on public.profiles
 
 -- Friend discovery without public profiles: given hashed phone numbers / emails from the
 -- caller's contacts, return only the people who registered one of those hashes as their own.
--- (Intentionally callable by signed-in users; returns nothing unless you already have their number/email.)
 create or replace function public.find_contacts_on_app(hashes text[])
 returns table (id uuid, username text, name text, avatar_url text)
 language sql stable security definer set search_path = '' as $$
@@ -65,3 +64,4 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke execute on function public.find_contacts_on_app(text[]) from public, anon;
 grant execute on function public.find_contacts_on_app(text[]) to authenticated;
+;

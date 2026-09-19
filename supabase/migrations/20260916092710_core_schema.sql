@@ -204,3 +204,4 @@ create table public.reports (
   reason text check (char_length(reason) <= 500),
   created_at timestamptz not null default now()
 );
+;

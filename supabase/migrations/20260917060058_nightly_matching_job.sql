@@ -2,3 +2,4 @@
 -- automatically as photos pass the 30-day mark.
 create extension if not exists pg_cron;
 select cron.schedule('nightly-near-miss-matching', '0 10 * * *', $$select private.match_everyone()$$);
+;

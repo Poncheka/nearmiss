@@ -30,3 +30,4 @@ language sql stable security definer set search_path = '' as $$
     ) > greatest(20, (select n from smaller) * 0.3);
 $$;
 revoke execute on function private.same_photo_library(uuid, uuid) from public, anon, authenticated;
+;
