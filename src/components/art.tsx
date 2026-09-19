@@ -1,20 +1,49 @@
 import { Text, View } from 'react-native';
-import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Image as SvgImage, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { colors, fonts } from '@/theme';
 
-/** Welcome illustration: two dotted paths almost crossing. */
+/**
+ * Welcome illustration: two dotted paths almost crossing.
+ *
+ * The two ends are faces rather than initials in coloured discs. This is the first screen anyone
+ * sees, and the promise is about people, which a J and an M in circles do not convey. Same two
+ * photos as the marketing site, so the app someone downloads looks like the page that sold it.
+ *
+ * Each photo is clipped to its circle, then the ring is drawn over the top so the outline stays
+ * crisp rather than being a cropped edge.
+ */
 export function WelcomeArt() {
   return (
     <Svg width={320} height={250} viewBox="0 0 320 250" fill="none">
+      <Defs>
+        <ClipPath id="wa-you"><Circle cx={34} cy={214} r={22} /></ClipPath>
+        <ClipPath id="wa-maya"><Circle cx={36} cy={36} r={22} /></ClipPath>
+      </Defs>
+
       <Circle cx={160} cy={124} r={40} fill={colors.violetTint} />
       <Path d="M34 214 C 84 204, 100 150, 148 136 S 236 64, 292 40" stroke={colors.violet} strokeWidth={3.5} strokeDasharray="1 10" strokeLinecap="round" />
       <Path d="M36 36 C 88 56, 118 96, 172 112 S 250 186, 294 214" stroke={colors.coral} strokeWidth={3.5} strokeDasharray="1 10" strokeLinecap="round" />
       <Circle cx={148} cy={136} r={7} fill={colors.violet} />
       <Circle cx={172} cy={112} r={7} fill={colors.coral} />
-      <Circle cx={34} cy={214} r={22} fill="#D9D0F7" stroke={colors.ink} strokeWidth={1.5} />
-      <SvgText x={34} y={220} textAnchor="middle" fontFamily={fonts.bold} fontWeight="700" fontSize={16} fill={colors.ink}>J</SvgText>
-      <Circle cx={36} cy={36} r={22} fill="#F6C9B9" stroke={colors.ink} strokeWidth={1.5} />
-      <SvgText x={36} y={42} textAnchor="middle" fontFamily={fonts.bold} fontWeight="700" fontSize={16} fill={colors.ink}>M</SvgText>
+
+      <Circle cx={34} cy={214} r={22} fill="#D9D0F7" />
+      <SvgImage
+        href={require('../../assets/hero-you.jpg')}
+        x={12} y={192} width={44} height={44}
+        preserveAspectRatio="xMidYMid slice"
+        clipPath="url(#wa-you)"
+      />
+      <Circle cx={34} cy={214} r={22} fill="none" stroke={colors.ink} strokeWidth={1.5} />
+
+      <Circle cx={36} cy={36} r={22} fill="#F6C9B9" />
+      <SvgImage
+        href={require('../../assets/hero-maya.jpg')}
+        x={14} y={14} width={44} height={44}
+        preserveAspectRatio="xMidYMid slice"
+        clipPath="url(#wa-maya)"
+      />
+      <Circle cx={36} cy={36} r={22} fill="none" stroke={colors.ink} strokeWidth={1.5} />
+
       <Rect x={182} y={140} width={52} height={26} rx={13} fill={colors.white} stroke={colors.handle} />
       <SvgText x={208} y={158} textAnchor="middle" fontFamily={fonts.semibold} fontWeight="600" fontSize={13} fill={colors.ink}>22m</SvgText>
     </Svg>
