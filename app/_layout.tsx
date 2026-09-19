@@ -60,6 +60,7 @@ function RootNavigator() {
         <Stack.Screen name="met/[id]" />
         <Stack.Screen name="map/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="that-day/[id]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="photo/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         <Stack.Screen name="friend/[id]" />
         <Stack.Screen name="reveal" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
         {/* Opened from the You tab only */}
@@ -68,6 +69,8 @@ function RootNavigator() {
         <Stack.Screen name="location" />
         <Stack.Screen name="location-history" />
         <Stack.Screen name="birthday" />
+        <Stack.Screen name="blocked" />
+        <Stack.Screen name="contacts" />
         <Stack.Screen name="delete-account" />
       </Stack.Protected>
 

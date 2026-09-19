@@ -1,16 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUp, ChevronLeft, ImagePlus } from 'lucide-react-native';
+import { ArrowUp, ChevronLeft, ChevronRight, ImagePlus, Play } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { NearMissGallery } from '@/components/NearMissGallery';
+import { ReactionBar } from '@/components/ReactionBar';
 import { ShareFromThatNight } from '@/components/ShareFromThatNight';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { addComment, barelyMissedLine, formatWhen, giveFeedback, isBarelyMissed, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
 import { occasionFor } from '@/lib/occasions';
+import { useReactions } from '@/lib/reactions';
 import { SharedPhoto, useSharedPhotos } from '@/lib/sharedPhotos';
 import { colors, fonts, pastel, radius } from '@/theme';
+
+/** Big enough to recognise the moment, small enough to still read as a message. */
+const THUMB = 200;
+
+/** One thing that happened, said or shared, so the thread can show them in order. */
+type Entry =
+  | { kind: 'text'; id: string; at: string; mine: boolean; body: string }
+  | { kind: 'photo'; id: string; at: string; mine: boolean; photo: SharedPhoto };
 
 const FEEDBACK: { kind: 'together' | 'not_interesting'; label: string }[] = [
   { kind: 'together', label: 'We were together' },
@@ -31,13 +41,28 @@ export function RealNearMissScreen({ id }: { id: string }) {
   }, [loaded]);
   const photos = useSharedPhotos((s) => (nm ? s.byNearMiss[nm.id] : undefined));
   const sharing = useSharedPhotos((s) => (nm ? !!s.busy[nm.id] : false));
+  const reactions = useReactions((s) => (nm ? s.byNearMiss[nm.id] : undefined));
 
   useEffect(() => {
     if (!nm) return;
     useNearMisses.getState().markRead(nm.id);
     loadComments(nm.id).then(setComments).catch(() => setComments([]));
     useSharedPhotos.getState().load(nm.id);
+    useReactions.getState().load(nm.id);
   }, [nm?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Said and shared, in the order it happened. Jeff's case: a message at 11:59 and a photo at
+  // 12:10 read backwards when the photos were pulled out into their own section.
+  const me0 = session?.user.id;
+  const timeline = useMemo<Entry[]>(() => {
+    const said: Entry[] = (comments ?? []).map((c) => ({
+      kind: 'text', id: c.id, at: c.created_at, mine: c.author_id === me0, body: c.body,
+    }));
+    const shown: Entry[] = (photos ?? []).map((p) => ({
+      kind: 'photo', id: p.id, at: p.created_at, mine: p.mine, photo: p,
+    }));
+    return [...said, ...shown].sort((a, b) => a.at.localeCompare(b.at));
+  }, [comments, photos, me0]);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -108,6 +133,13 @@ export function RealNearMissScreen({ id }: { id: string }) {
     },
   ]);
 
+  const openProfile = () => router.push({ pathname: '/friend/[id]', params: { id: nm.other_id } });
+
+  const openPhoto = (photo: SharedPhoto) => {
+    const at = (photos ?? []).findIndex((p) => p.id === photo.id);
+    router.push({ pathname: '/photo/[id]', params: { id: nm.id, index: String(Math.max(at, 0)) } });
+  };
+
   const otherAvatar = (size: number) => nm.other_avatar_url
     ? <Image source={{ uri: nm.other_avatar_url }} style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: colors.white }} />
     : <Avatar initial={name.replace('@', '').charAt(0).toUpperCase()} color={pastel.peach} size={size} ring />;
@@ -123,11 +155,23 @@ export function RealNearMissScreen({ id }: { id: string }) {
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
           <View style={{ gap: 8 }}>
-            <View style={{ width: 64 + 40, height: 64 }}>
-              <View style={{ position: 'absolute', left: 0 }}><PersonAvatar id="jeff" size={64} ring /></View>
-              <View style={{ position: 'absolute', left: 40 }}>{otherAvatar(64)}</View>
-            </View>
-            <Display size={36}>You + {name}</Display>
+            {/* The two faces and the title are one target, because "who is this person" is the
+                question you have while looking at them, not one you go to a menu for. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${name}'s profile`}
+              onPress={openProfile}
+              style={({ pressed }) => ({ gap: 8, opacity: pressed ? 0.6 : 1 })}
+            >
+              <View style={{ width: 64 + 40, height: 64 }}>
+                <View style={{ position: 'absolute', left: 0 }}><PersonAvatar id="jeff" size={64} ring /></View>
+                <View style={{ position: 'absolute', left: 40 }}>{otherAvatar(64)}</View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Display size={36}>You + {name}</Display>
+                <ChevronRight size={22} color={colors.faint} strokeWidth={2.5} style={{ marginTop: 4 }} />
+              </View>
+            </Pressable>
             <Body size={17} color={colors.text2}>{placeLabel(nm)}</Body>
             <Body size={17} color={colors.text2}>{when.date} · {when.time}</Body>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 2 }}>
@@ -159,21 +203,59 @@ export function RealNearMissScreen({ id }: { id: string }) {
             onUnshare={unshare}
           />
 
-          {/* Just the conversation now. The photos moved up into the gallery, where they are the
-              first thing you see rather than an attachment halfway down a thread. */}
+          {/* The photos live in the gallery above, where they are the first thing you see, and
+              they appear here too, in the order everything actually happened. A photo sent
+              between two messages is part of the conversation, and pulling it out left replies
+              answering nothing. */}
           <View style={{ gap: 10 }}>
             <Body size={17} weight="bold" style={{ paddingHorizontal: 4 }}>
-              {(comments ?? []).length ? 'That day' : `Ask ${name} about that day`}
+              {timeline.length ? 'That day' : `Ask ${name} about that day`}
             </Body>
-            {comments === null ? <ActivityIndicator color={colors.violet} /> : comments.map((c) => {
-              const mine = c.author_id === me;
-              const stamp = new Date(c.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+            {comments === null ? <ActivityIndicator color={colors.violet} /> : timeline.map((entry) => {
+              const stamp = new Date(entry.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+              const mine = entry.mine;
               return (
-                <View key={c.id} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
-                  {!mine && otherAvatar(32)}
-                  <View style={{ maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, backgroundColor: mine ? colors.violet : colors.white, borderWidth: mine ? 0 : 1, borderColor: colors.cardBorder }}>
-                    <Body size={15} color={mine ? colors.white : colors.ink}>{c.body}</Body>
-                    <Body size={11} color={mine ? 'rgba(255,255,255,0.7)' : colors.faint}>{stamp}</Body>
+                <View key={`${entry.kind}-${entry.id}`} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                  {!mine && (
+                    <Pressable accessibilityLabel={`Open ${name}'s profile`} onPress={openProfile}>
+                      {otherAvatar(32)}
+                    </Pressable>
+                  )}
+                  <View style={{ maxWidth: '78%', gap: 4, alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                    {entry.kind === 'text' ? (
+                      <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, backgroundColor: mine ? colors.violet : colors.white, borderWidth: mine ? 0 : 1, borderColor: colors.cardBorder }}>
+                        <Body size={15} color={mine ? colors.white : colors.ink}>{entry.body}</Body>
+                        <Body size={11} color={mine ? 'rgba(255,255,255,0.7)' : colors.faint}>{stamp}</Body>
+                      </View>
+                    ) : (
+                      <Pressable
+                        accessibilityLabel={`Open ${entry.photo.isVideo ? 'video' : 'photo'} full screen`}
+                        onPress={() => openPhoto(entry.photo)}
+                        style={{ width: THUMB, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.sand }}
+                      >
+                        {entry.photo.url ? (
+                          <Image source={{ uri: entry.photo.url }} style={{ width: THUMB, height: THUMB }} resizeMode="cover" />
+                        ) : (
+                          <View style={{ width: THUMB, height: THUMB, alignItems: 'center', justifyContent: 'center' }}>
+                            <ActivityIndicator color={colors.violet} />
+                          </View>
+                        )}
+                        {entry.photo.isVideo ? (
+                          <View style={{ position: 'absolute', left: 10, bottom: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                            <Play size={13} color={colors.white} fill={colors.white} />
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    )}
+                    {nm ? (
+                      <ReactionBar
+                        nearMissId={nm.id}
+                        target={entry.kind === 'text' ? 'comment' : 'photo'}
+                        targetId={entry.id}
+                        all={reactions}
+                        align={mine ? 'right' : 'left'}
+                      />
+                    ) : null}
                   </View>
                 </View>
               );

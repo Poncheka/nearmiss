@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 
-export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed';
+export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed' | 'reaction';
 
 export type RealActivity = {
   id: string;
@@ -49,6 +49,8 @@ export function activityText(a: RealActivity): string {
     // Worth telling them: this is what moves near misses between "before you met" and the rest,
     // so their feed rearranges itself and otherwise there is nothing to explain why.
     case 'met_changed': return 'set when you two met';
+    // The emoji itself is the message, so it goes in the line rather than being described.
+    case 'reaction': return a.body ? `reacted ${a.body}` : 'reacted to something of yours';
     default: return 'did something';
   }
 }

@@ -2,11 +2,15 @@
 // Contacts never leave the phone. Only one-way fingerprints (SHA-256) of their email
 // addresses are sent, and the server only answers with people who registered that address.
 import { Linking, Platform, Share } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { useNearMisses } from '@/lib/nearMisses';
+
+/** Remembers that contact matching was turned off, so a relaunch doesn't re-register you. */
+const UNLINKED_KEY = 'nearmiss.contacts.unlinked';
 
 type ContactsModule = typeof import('expo-contacts');
 
@@ -101,6 +105,10 @@ type ContactsState = {
   load: (ask?: boolean) => Promise<void>;
   refreshFriends: () => Promise<void>;
   addFriend: (id: string) => Promise<FriendStatus>;
+  /** True once contact matching has been turned off on this account. */
+  unlinked: boolean;
+  /** Stop being findable by phone or email, and forget the address book held here. */
+  unlink: () => Promise<void>;
   reset: () => void;
 };
 
@@ -112,15 +120,19 @@ export const useContacts = create<ContactsState>((set, get) => ({
   onApp: [],
   statuses: {},
   friends: [],
+  unlinked: false,
   checkAccess: async () => {
+    // Remembered across launches, so unlinking survives a restart.
+    try { if (await AsyncStorage.getItem(UNLINKED_KEY)) set({ unlinked: true }); } catch { /* ignore */ }
     set({ access: await getContactsAccess().catch(() => 'unavailable' as const) });
   },
   load: async (ask = false) => {
     if (get().loading) return;
     set({ loading: true, error: null });
     try {
-      // Make sure people who have your email in their contacts can find you.
-      supabase.rpc('register_my_contact_hashes').then(() => {}, () => {});
+      // Make sure people who have your email in their contacts can find you. Skipped once you
+      // have unlinked, otherwise the next refresh would quietly put you back.
+      if (!get().unlinked) supabase.rpc('register_my_contact_hashes').then(() => {}, () => {});
       let access = await getContactsAccess();
       if (ask && (access === 'undetermined' || access === 'denied')) access = await requestContactsAccess();
       set({ access });
@@ -166,6 +178,15 @@ export const useContacts = create<ContactsState>((set, get) => ({
     if (status === 'friends') useNearMisses.getState().load({ rematch: true });
     return status;
   },
+  unlink: async () => {
+    const { error } = await supabase.rpc('unlink_my_contacts');
+    if (error) throw new Error(error.message);
+    // The address book copy lives only in this store, so dropping it is the whole of the
+    // on-device half. The operating system permission is the person's to revoke, in Settings.
+    set({ contacts: [], onApp: [], unlinked: true });
+    await AsyncStorage.setItem(UNLINKED_KEY, '1').catch(() => {});
+  },
+
   reset: () => set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [] }),
 }));
 

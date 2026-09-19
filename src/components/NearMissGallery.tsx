@@ -76,9 +76,11 @@ export function NearMissGallery({
           </View>
         </Pressable>
 
-        {photos.map((photo) => (
+        {photos.map((photo, i) => (
           <Pressable
             key={photo.id}
+            accessibilityLabel={`Open ${photo.isVideo ? 'video' : 'photo'} full screen`}
+            onPress={() => router.push({ pathname: '/photo/[id]', params: { id: nm.id, index: String(i) } })}
             onLongPress={() => photo.mine && onUnshare(photo)}
             style={{ width, height: HEIGHT, backgroundColor: colors.ink }}
           >
@@ -91,6 +93,13 @@ export function NearMissGallery({
             ) : (
               <Image source={{ uri: photo.url }} style={{ width, height: HEIGHT }} resizeMode="cover" />
             )}
+            {/* The carousel crops to fill, so it isn't obvious there is more of the picture.
+                This says there is. */}
+            {!photo.isVideo && photo.url ? (
+              <View style={{ position: 'absolute', right: 12, top: 12, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' }}>
+                <Maximize2 size={15} color={colors.white} strokeWidth={2.2} />
+              </View>
+            ) : null}
           </Pressable>
         ))}
       </ScrollView>

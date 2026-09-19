@@ -349,6 +349,22 @@ export default function SettingsScreen() {
         <SectionLabel>Birthday</SectionLabel>
         <BirthdayRow />
 
+        <SectionLabel>People</SectionLabel>
+        <Group>
+          <Pressable onPress={() => router.push('/contacts')}>
+            <Row minHeight={56}>
+              <Label title="Contacts" sub="Whether friends can find you by number or email" />
+              <ChevronRight size={16} color={colors.faint} />
+            </Row>
+          </Pressable>
+          <Pressable onPress={() => router.push('/blocked')}>
+            <Row last minHeight={56}>
+              <Label title="Blocked" sub="People who can't find you or match with you" />
+              <ChevronRight size={16} color={colors.faint} />
+            </Row>
+          </Pressable>
+        </Group>
+
         <View style={{ height: 20 }} />
         <Group>
           <Row>

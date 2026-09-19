@@ -11,6 +11,7 @@ import { resetScanCursor } from '@/lib/photoScan';
 import { usePlaces } from '@/lib/places';
 import { useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
+import { useReactions } from '@/lib/reactions';
 import { useSharedPhotos } from '@/lib/sharedPhotos';
 
 export type Profile = {
@@ -288,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useContacts.getState().reset();
     useNearMisses.getState().reset();
     useSharedPhotos.getState().reset();
+    useReactions.getState().reset();
     // Before the session goes, so this phone stops receiving their notifications.
     await unregisterPush();
     await supabase.auth.signOut();
