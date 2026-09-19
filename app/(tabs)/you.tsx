@@ -7,6 +7,8 @@ import { ChevronRight, Settings as SettingsIcon, UserPlus } from 'lucide-react-n
 import { Body, Card, Display, Screen, SectionLabel } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { AvatarPicker } from '@/components/AvatarPicker';
+import { ActivityButton } from '@/components/ActivityButton';
+import { InviteLink } from '@/components/InviteLink';
 import { useAuth } from '@/lib/auth';
 import { AppUser, useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
@@ -72,13 +74,16 @@ export default function You() {
     <Screen>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Display size={32}>You</Display>
-        <Pressable
-          accessibilityLabel="Settings"
-          onPress={() => router.push('/settings')}
-          style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.cardBorder }}
-        >
-          <SettingsIcon size={20} color={colors.ink} strokeWidth={2} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <ActivityButton />
+          <Pressable
+            accessibilityLabel="Settings"
+            onPress={() => router.push('/settings')}
+            style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.cardBorder }}
+          >
+            <SettingsIcon size={20} color={colors.ink} strokeWidth={2} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 32, gap: 16 }}>
@@ -94,6 +99,8 @@ export default function You() {
             <Stat n={items.length} label={items.length === 1 ? 'near miss' : 'near misses'} />
           </View>
         </Card>
+
+        <InviteLink username={profile?.username} />
 
         <View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

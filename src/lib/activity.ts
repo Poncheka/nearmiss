@@ -1,6 +1,7 @@
 // What's happened lately: friend requests, accepts, and comments on your near misses.
 // The rows are written by database triggers, so anything here really happened.
 import { create } from 'zustand';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 
 export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed' | 'reaction';
@@ -32,6 +33,18 @@ type State = {
   markOneRead: (id: string) => Promise<void>;
   reset: () => void;
 };
+
+/**
+ * Keep the red number on the app icon honest.
+ *
+ * The push payload sets it when a notification arrives, and nothing was ever clearing it, so it
+ * only ever climbed. Forty eight unread on an icon whose list says everything is read is the
+ * kind of thing that gets an app deleted. Every path that changes the unread count sets the
+ * badge to match, including to zero.
+ */
+function syncBadge(n: number) {
+  Notifications.setBadgeCountAsync(Math.max(0, n)).catch(() => {});
+}
 
 export const actorName = (a: Pick<RealActivity, 'actor_name' | 'actor_username'>) =>
   a.actor_name?.split(' ')[0] || (a.actor_username ? `@${a.actor_username}` : 'Someone');
@@ -78,7 +91,9 @@ export const useActivity = create<State>((set, get) => ({
       const { data, error } = await supabase.rpc('my_activity', { limit_n: 100 });
       if (error) throw new Error(error.message);
       const items = (data ?? []) as RealActivity[];
-      set({ items, loaded: true, unread: items.filter((i) => !i.read_at).length });
+      const unread = items.filter((i) => !i.read_at).length;
+      set({ items, loaded: true, unread });
+      syncBadge(unread);
     } catch (e) {
       console.warn('Loading activity failed', e);
       set({ loaded: true });
@@ -88,11 +103,16 @@ export const useActivity = create<State>((set, get) => ({
   },
   refreshUnread: async () => {
     const { data, error } = await supabase.rpc('my_unread_activity');
-    if (!error) set({ unread: Number(data ?? 0) });
+    if (!error) {
+      const unread = Number(data ?? 0);
+      set({ unread });
+      syncBadge(unread);
+    }
   },
   markAllRead: async () => {
     const now = new Date().toISOString();
     set({ unread: 0, items: get().items.map((i) => (i.read_at ? i : { ...i, read_at: now })) });
+    syncBadge(0);
     await supabase.rpc('mark_activity_read').then(() => {}, () => {});
   },
   markOneRead: async (id) => {
@@ -103,8 +123,12 @@ export const useActivity = create<State>((set, get) => ({
       items: get().items.map((i) => (i.id === id ? { ...i, read_at: now } : i)),
       unread: Math.max(0, get().unread - 1),
     });
+    syncBadge(get().unread);
     await supabase.rpc('mark_activity_read_one', { a_id: id });
   },
 
-  reset: () => set({ items: [], unread: 0, loaded: false, loading: false }),
+  reset: () => {
+    syncBadge(0);
+    set({ items: [], unread: 0, loaded: false, loading: false });
+  },
 }));

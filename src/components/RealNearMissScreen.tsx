@@ -8,6 +8,7 @@ import { ReactionBar } from '@/components/ReactionBar';
 import { SharedVideo } from '@/components/SharedVideo';
 import { ShareFromThatNight } from '@/components/ShareFromThatNight';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { addComment, barelyMissedLine, formatWhen, giveFeedback, isBarelyMissed, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
 import { occasionFor } from '@/lib/occasions';
@@ -31,6 +32,7 @@ const FEEDBACK: { kind: 'together' | 'not_interesting'; label: string }[] = [
 export function RealNearMissScreen({ id }: { id: string }) {
   const { session, profile } = useAuth();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const nm = useNearMisses((s) => s.items.find((x) => x.id === id));
   const loaded = useNearMisses((s) => s.loaded);
   const [comments, setComments] = useState<NearMissComment[] | null>(null);
@@ -52,8 +54,9 @@ export function RealNearMissScreen({ id }: { id: string }) {
     useReactions.getState().load(nm.id);
   }, [nm?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Said and shared, in the order it happened. Jeff's case: a message at 11:59 and a photo at
-  // 12:10 read backwards when the photos were pulled out into their own section.
+  // Newest first. This is a feed about one night, not a chat: you come back to it weeks later
+  // to see whether they replied, and the thing you want is at the top rather than after a
+  // scroll through everything you already read.
   const me0 = session?.user.id;
   const timeline = useMemo<Entry[]>(() => {
     const said: Entry[] = (comments ?? []).map((c) => ({
@@ -62,7 +65,7 @@ export function RealNearMissScreen({ id }: { id: string }) {
     const shown: Entry[] = (photos ?? []).map((p) => ({
       kind: 'photo', id: p.id, at: p.created_at, mine: p.mine, photo: p,
     }));
-    return [...said, ...shown].sort((a, b) => a.at.localeCompare(b.at));
+    return [...said, ...shown].sort((a, b) => b.at.localeCompare(a.at));
   }, [comments, photos, me0]);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -146,7 +149,7 @@ export function RealNearMissScreen({ id }: { id: string }) {
     : <Avatar initial={name.replace('@', '').charAt(0).toUpperCase()} color={pastel.peach} size={size} ring />;
 
   return (
-    <Screen edges={['top', 'bottom']}>
+    <Screen edges={['top']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <IconButton label="Back" onPress={back}><ChevronLeft size={20} color={colors.ink} /></IconButton>
@@ -270,7 +273,9 @@ export function RealNearMissScreen({ id }: { id: string }) {
           </View>
         </ScrollView>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.inputBorder, backgroundColor: colors.white }}>
+        {/* The bar carries the home-indicator inset itself, so the white runs to the bottom of
+            the phone instead of floating above a strip of background. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 10), borderTopWidth: 1, borderTopColor: colors.inputBorder, backgroundColor: colors.white }}>
           <Pressable
             accessibilityLabel="Share a photo from that day"
             onPress={sharePhoto}

@@ -1,8 +1,9 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { Bell, ChevronRight, MessageCircle } from 'lucide-react-native';
+import { ChevronRight, MessageCircle } from 'lucide-react-native';
 import { Body, Chip, ChipTone, Display, IconButton, Screen, UnreadDot, Wordmark } from '@/components/ui';
+import { ActivityButton } from '@/components/ActivityButton';
 import { Avatar, AvatarPair, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { useAuth } from '@/lib/auth';
@@ -304,8 +305,6 @@ export default function Feed() {
     return t;
   };
 
-  const realUnread = useActivity((s) => s.unread);
-  const unreadActivity = demo ? (activityRead ? 0 : activity.filter((a) => a.fresh).length) : realUnread;
 
   const header = !demo ? null : (
     <Pressable onPress={() => router.push('/reveal')} style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violet, gap: 12, marginBottom: 4 }}>
@@ -339,16 +338,7 @@ export default function Feed() {
       <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Wordmark size={28} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View>
-            <IconButton label="Activity" onPress={() => router.push('/activity')}>
-              <Bell size={20} color={colors.ink} strokeWidth={1.8} />
-            </IconButton>
-            {unreadActivity > 0 && (
-              <View style={{ position: 'absolute', top: -3, right: -3, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, backgroundColor: colors.violet, borderWidth: 2, borderColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontFamily: fonts.bold, fontSize: 11, color: colors.white }}>{unreadActivity}</Text>
-              </View>
-            )}
-          </View>
+          <ActivityButton />
           <Pressable accessibilityLabel="Your profile" onPress={() => router.navigate('/you')}>
             <PersonAvatar id="jeff" size={40} />
           </Pressable>

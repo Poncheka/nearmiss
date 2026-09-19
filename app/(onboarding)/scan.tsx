@@ -14,11 +14,13 @@ type Step = 'intro' | 'denied' | 'scanning' | 'done';
 const fmt = (n: number) => n.toLocaleString('en-US');
 const monthYear = (ms: number | null) => (ms == null ? null : new Date(ms).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
 
+// flex: 1 on the text, because without it a label longer than the row ran off the screen
+// instead of wrapping, and the last word of two of these was invisible on a narrow phone.
 function Point({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
       <IconTile size={30} radiusSize={10}>{icon}</IconTile>
-      <Body size={15} weight="semibold">{label}</Body>
+      <Body size={15} weight="semibold" style={{ flex: 1 }}>{label}</Body>
     </View>
   );
 }
@@ -96,7 +98,7 @@ export default function Scan() {
       <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 22 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <IconButton label={step === 'intro' ? 'Sign out' : 'Back'} onPress={back}><ChevronLeft size={20} color={colors.ink} /></IconButton>
-          <ProgressDots total={4} active={1} />
+          <ProgressDots total={3} active={1} />
           <View style={{ width: 44 }} />
         </View>
 
@@ -106,18 +108,16 @@ export default function Scan() {
               <ScanArt />
             </View>
             <View style={{ gap: 10 }}>
-              <Display size={34}>Your photos' data, not your photos</Display>
+              <Display size={34}>Connect your photo history</Display>
               <Body size={17} color={colors.text2}>
-                Every photo records when and where it was taken. Near Miss reads those two things
-                and saves nothing else. The picture never leaves your phone, and nobody here can
-                open your library or see what is in it.
+                We use the time and location attached to your photos to find when you and your
+                friends were nearby.
               </Body>
             </View>
             <View style={{ gap: 10 }}>
-              <Point icon={<Lock size={16} color={colors.violet} strokeWidth={2.2} />} label="A time and a place. That is all that is saved" />
-              <Point icon={<ImageOff size={16} color={colors.violet} strokeWidth={2.2} />} label="No photo is ever uploaded or looked at" />
-              <Point icon={<Check size={16} color={colors.violet} strokeWidth={2.2} />} label="Sharing an actual photo is always your choice, later" />
-              <Point icon={<House size={16} color={colors.violet} strokeWidth={2.2} />} label="Hide places like home, and skip the last 30 days" />
+              <Point icon={<Lock size={16} color={colors.violet} strokeWidth={2.2} />} label="Time and location finds the match" />
+              <Point icon={<ImageOff size={16} color={colors.violet} strokeWidth={2.2} />} label="You can privately review photos from that moment" />
+              <Point icon={<Check size={16} color={colors.violet} strokeWidth={2.2} />} label="You choose what, if anything, gets shared" />
             </View>
             {scan.error ? <Body size={14} color={colors.danger}>{scan.error}</Body> : null}
             {access === 'unavailable' && !demo ? (
@@ -129,8 +129,7 @@ export default function Scan() {
               {access !== 'unavailable' || demo ? <Button label={scan.error ? 'Try again' : 'Find my near misses'} onPress={begin} /> : null}
               {access !== 'granted' && access !== 'unavailable' && (
                 <Body size={13} color={colors.muted} style={{ textAlign: 'center', paddingTop: 4 }}>
-                  iOS will ask next. Full Access lets us read the dates and places; with Limited we
-                  only see the handful you pick, so most of your history stays invisible to us.
+                  Choose Full Access so we can read every date and place
                 </Body>
               )}
               <Button label="Skip for now" variant="text" onPress={next} />

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Pressable, SectionList, Share, Text, TextInput, View } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, SectionList, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { BookUser, Search, Share as ShareIcon, X } from 'lucide-react-native';
+import { BookUser, Search, X } from 'lucide-react-native';
 import { Body, Button, Card, Display, Pill, ProgressDots, Screen, SectionLabel } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
+import { ActivityButton } from '@/components/ActivityButton';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
-import { AppUser, chooseMoreContacts, findByUsername, FriendStatus, inviteLink, inviteMessage, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
+import { AppUser, chooseMoreContacts, findByUsername, FriendStatus, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
 import { useAuth } from '@/lib/auth';
 import { colors, fonts, pastel, radius } from '@/theme';
 
@@ -25,10 +25,9 @@ const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name
 type Row = { kind: 'user'; user: AppUser } | { kind: 'contact'; contact: PhoneContact };
 
 export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) {
-  const { profile, demo } = useAuth();
+  const { profile, demo, finishOnboarding } = useAuth();
   const c = useContacts();
   const [q, setQ] = useState('');
-  const [copied, setCopied] = useState(false);
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [demoStatus, setDemoStatus] = useState<Record<string, FriendStatus>>({ sam: 'friends' });
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -62,14 +61,6 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     }, 350);
     return () => { live = false; clearTimeout(t); };
   }, [q, demo]);
-
-  const link = inviteLink(profile?.username);
-  const copy = async () => {
-    await Clipboard.setStringAsync(link).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  const shareLink = () => Share.share({ message: inviteMessage(profile?.username) }).catch(() => {});
 
   const access = demo ? 'granted' : c.access;
   const hasAccess = access === 'granted' || access === 'limited';
@@ -108,6 +99,13 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     }
   };
 
+  // This is the last onboarding step now that location has moved to Settings, so this is what
+  // marks it finished. Miss this and a new account loops back to step one forever.
+  const done = async () => {
+    try { await finishOnboarding(); } catch { /* the app opens anyway */ }
+    router.replace('/');
+  };
+
   const invite = async (p: PhoneContact) => {
     setInvited((s) => ({ ...s, [p.id]: true }));
     if (demo) return;
@@ -116,24 +114,6 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
 
   const header = (
     <View style={{ gap: 12, paddingBottom: 4 }}>
-      {!query && (
-        <View style={{ padding: 16, borderRadius: radius.cardLg, backgroundColor: colors.violet, gap: 12 }}>
-          <View style={{ gap: 4 }}>
-            <Display size={22} style={{ color: colors.white }}>Invite friends to see your missed connections</Display>
-            <Body size={14} color="rgba(255,255,255,0.85)">When they join and scan their photos, you'll both see every time you were steps apart.</Body>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 6, paddingLeft: 14, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.14)' }}>
-            <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.white }}>{link.replace(/^https?:\/\//, '')}</Text>
-            <Pressable accessibilityLabel="Share invite" onPress={shareLink} hitSlop={6} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-              <ShareIcon size={18} color={colors.white} strokeWidth={2} />
-            </Pressable>
-            <Pressable onPress={copy} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: colors.violet }}>{copied ? 'Copied' : 'Copy link'}</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-
       {!hasAccess && access !== null && access !== 'unavailable' && (
         <Card style={{ padding: 16, gap: 12 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
@@ -181,12 +161,13 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
         {onboarding && (
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
             <View style={{ width: 44 }} />
-            <ProgressDots total={4} active={3} />
-            <Pill label="Next" variant="ink" height={40} onPress={() => router.push('/turn-on-location')} />
+            <ProgressDots total={3} active={3} />
+            <Pill label="Done" variant="ink" height={40} onPress={done} />
           </View>
         )}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
-          <Display size={32}>{onboarding ? 'Find your friends' : 'Invite'}</Display>
+          <Display size={32}>{onboarding ? 'Find your friends' : 'Search'}</Display>
+          {!onboarding && <ActivityButton />}
         </View>
         {(hasAccess || !demo) && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder }}>

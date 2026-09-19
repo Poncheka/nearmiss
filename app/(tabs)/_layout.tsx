@@ -2,14 +2,14 @@ import { useEffect } from 'react';
 import { AppState, Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { User, UserPlus } from 'lucide-react-native';
+import { Search, User } from 'lucide-react-native';
 import { OverlapIcon } from '@/components/art';
 import { useAuth } from '@/lib/auth';
 import { useScan } from '@/state/scan';
 import { colors, fonts } from '@/theme';
 
 const TABS: Record<string, { label: string; icon: (c: string) => React.ReactNode }> = {
-  invite: { label: 'Invite', icon: (c) => <UserPlus size={24} color={c} strokeWidth={1.8} /> },
+  invite: { label: 'Search', icon: (c) => <Search size={24} color={c} strokeWidth={1.8} /> },
   index: { label: 'Near misses', icon: (c) => <OverlapIcon color={c} /> },
   you: { label: 'You', icon: (c) => <User size={24} color={c} strokeWidth={1.8} /> },
 };
