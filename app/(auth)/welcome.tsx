@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Body, Button, Display, Screen, TextLink, Wordmark } from '@/components/ui';
 import { WelcomeArt } from '@/components/art';
-import { errorMessage, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
+import { errorMessage, getGoogleButton, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
 import { colors, radius } from '@/theme';
 
 export default function Welcome() {
@@ -15,6 +15,9 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false);
   // Apple and Google sign-in aren't included in Expo Go; they work in development and App Store builds.
   const isIOS = Platform.OS === 'ios' && !inExpoGo;
+  // Loaded through the same lazy require as the rest of the Google module, so Expo Go (which
+  // has no native side for it) still starts.
+  const GoogleButton = googleAvailable ? getGoogleButton() : null;
 
   useEffect(() => {
     if (!isIOS) return;
@@ -61,7 +64,19 @@ export default function Welcome() {
             />
           )}
           {isIOS && nativeApple === false && <Button label="Continue with Apple" variant="ink" onPress={apple} />}
-          {googleAvailable && <Button label="Continue with Google" variant="white" onPress={google} />}
+          {/* Google's own button, not a lookalike. Their branding guidelines require the real
+              mark on a Google sign-in control, and using the component they ship means the logo
+              is theirs rather than an approximation of it. */}
+          {googleAvailable && GoogleButton
+            ? <GoogleButton
+                size={GoogleButton.Size.Wide}
+                color={GoogleButton.Color.Light}
+                onPress={google}
+                style={{ width: '100%', height: 54 }}
+              />
+            : googleAvailable
+              ? <Button label="Continue with Google" variant="white" onPress={google} />
+              : null}
           <Button label="Continue with email" variant={isIOS || googleAvailable ? 'white' : 'ink'} onPress={() => router.push('/email')} />
           {__DEV__ && <Button label="Look around with sample data" variant="text" onPress={startDemo} />}
           {inExpoGo && (

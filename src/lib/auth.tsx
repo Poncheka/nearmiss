@@ -116,6 +116,21 @@ function getGoogle(): GoogleModule {
   return googleModule;
 }
 
+/**
+ * Google's own sign-in button.
+ *
+ * Their branding guidelines ask for the real mark on a Google sign-in control, so this uses the
+ * component they ship rather than a button that resembles one. Behind the same lazy require as
+ * the rest of the module, because Expo Go has no native side for it.
+ */
+export function getGoogleButton() {
+  try {
+    return getGoogle().GoogleSigninButton;
+  } catch {
+    return null;
+  }
+}
+
 const demoProfile: Profile = { id: 'demo', username: 'jeff', name: 'Jeff', bio: 'SF. Always at the show.', avatar_url: null, birthday: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
