@@ -12,6 +12,7 @@ import { Access, choosePhotos, clearScanData, getPhotoAccess, photoScanAvailable
 import { timelineStats } from '@/lib/timelineImport';
 import { usePlaces } from '@/lib/places';
 import { useScan } from '@/state/scan';
+import { askForPush, pushState, PushState } from '@/lib/push';
 import { colors } from '@/theme';
 
 type Audience = Settings['audience'];
@@ -83,6 +84,55 @@ function Row({ children, last, minHeight = 52 }: { children: React.ReactNode; la
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight, gap: 12, paddingVertical: 6 }}>{children}</View>
       {!last && <Divider />}
     </>
+  );
+}
+
+/**
+ * Whether notifications are on at all, above the six switches that assume they are.
+ *
+ * Without this the section was a lie: with permission off, every toggle below saves happily to
+ * the server and nothing ever arrives, and there was nowhere in the app to turn them on. The
+ * feed card was the only door, and it is shown once on purpose.
+ *
+ * Three states, three different things to offer. iOS has not been asked yet, so ask. iOS has
+ * been asked and told no, so it will never prompt again and the only route is the Settings app.
+ * Or they are on, in which case say so and get out of the way.
+ */
+function PushPermissionRow({ demo }: { demo: boolean }) {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const refresh = useCallback(() => { pushState().then(setState).catch(() => {}); }, []);
+  // On focus, because turning them on happens in the Settings app and we come back to this screen.
+  useFocusEffect(useCallback(() => { if (!demo) refresh(); }, [demo, refresh]));
+
+  if (demo || !state || state.granted) return null;
+
+  const turnOn = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (state.canAskAgain) await askForPush();
+      else await Linking.openSettings();
+    } finally {
+      setBusy(false);
+      refresh();
+    }
+  };
+
+  return (
+    <Pressable onPress={turnOn} disabled={busy}>
+      <Card style={{ padding: 16, gap: 10, borderColor: colors.violet }}>
+        <Body size={15} weight="bold">Notifications are off</Body>
+        <Body size={14} color={colors.muted}>
+          {state.canAskAgain
+            ? 'Nothing below will reach you until they are on.'
+            : 'iOS will not ask again, so this one has to be turned on in the Settings app, under Near Miss.'}
+        </Body>
+        {busy
+          ? <ActivityIndicator color={colors.violet} style={{ alignSelf: 'flex-start' }} />
+          : <TextLink label={state.canAskAgain ? 'Turn on notifications' : 'Open Settings'} onPress={turnOn} />}
+      </Card>
+    </Pressable>
   );
 }
 
@@ -332,6 +382,7 @@ export default function SettingsScreen() {
         </Body>
 
         <SectionLabel>Notify me about</SectionLabel>
+        <PushPermissionRow demo={demo} />
         <Group>
           {notifOptions.map((n, i) => (
             <Row key={n.id} last={i === notifOptions.length - 1} minHeight={60}>

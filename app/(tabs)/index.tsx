@@ -11,6 +11,7 @@ import { barelyMissedLine, formatWhen, isBarelyMissed, kindLabel, nearLabel, Nee
 import { occasionFor } from '@/lib/occasions';
 import { NearMissCard, RealPair } from '@/components/NearMissCard';
 import { PushOffer } from '@/components/PushOffer';
+import { canOfferPush } from '@/lib/push';
 import { useActivity } from '@/lib/activity';
 import { MiniMap } from '@/components/art';
 import { activity, nearMisses, NearMiss, people } from '@/data/mock';
@@ -227,6 +228,18 @@ export default function Feed() {
   const [showSince, setShowSince] = useState(false);
   const [sort, setSort] = useState<Sort>('found');
 
+  // Whether there is a notifications offer left to make, decided here rather than inside the
+  // card. A FlatList throws away rows that scroll off and rebuilds them, so a card that decided
+  // this for itself forgot it had been answered every time it left the screen, which is what
+  // made it look like the app kept asking. Checked once when the feed gains focus, and turned
+  // off the moment either button is pressed.
+  const [offerPush, setOfferPush] = useState(false);
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    canOfferPush().then((can) => { if (live) setOfferPush(can); }).catch(() => {});
+    return () => { live = false; };
+  }, []));
+
   // Oldest first, with a year label whenever the year changes.
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -247,7 +260,7 @@ export default function Feed() {
         out.push({ kind: 'real', nm });
       }
       const first = out.findIndex((r) => r.kind === 'real');
-      if (first !== -1) out.splice(first + 1, 0, { kind: 'push' });
+      if (offerPush && first !== -1) out.splice(first + 1, 0, { kind: 'push' });
       return out;
     }
     if (!demo) {
@@ -281,7 +294,7 @@ export default function Feed() {
       withYears(before);
       // Under the first near miss, where the question answers itself.
       const first = out.findIndex((r) => r.kind === 'real');
-      if (first !== -1) out.splice(first + 1, 0, { kind: 'push' });
+      if (offerPush && first !== -1) out.splice(first + 1, 0, { kind: 'push' });
       // A guess later than every near miss we have: ask at the end rather than never.
       for (const f of pending) if (!asked.has(f.friend_id)) out.push({ kind: 'ask', friend: f });
       if (since.length) {
@@ -295,7 +308,7 @@ export default function Feed() {
       out.push({ kind: 'post', nm });
     }
     return out;
-  }, [demo, real.items, real.needsMetOn, showSince, sort]);
+  }, [demo, real.items, real.needsMetOn, showSince, sort, offerPush]);
 
   const tagsFor = (nm: NearMiss) => {
     const t: { label: string; tone: ChipTone }[] = [];
@@ -382,7 +395,7 @@ export default function Feed() {
         ) : item.kind === 'found' ? (
           <Text style={{ fontFamily: fonts.display, fontSize: 18, color: colors.ink, paddingTop: 10, paddingHorizontal: 4 }}>{item.label}</Text>
         ) : item.kind === 'push' ? (
-          <PushOffer />
+          <PushOffer onAnswered={() => setOfferPush(false)} />
         ) : item.kind === 'ask' ? (
           <AskWhenMet friend={item.friend} />
         ) : item.kind === 'since' ? (

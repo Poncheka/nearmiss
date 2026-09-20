@@ -50,17 +50,37 @@ async function register(): Promise<boolean> {
   }
 }
 
+export type PushState = {
+  /** Notifications are on at the operating system level. */
+  granted: boolean;
+  /** iOS will still show its prompt. False once it has been answered, either way. */
+  canAskAgain: boolean;
+  /** We have already put the offer in front of them, whatever they said to it. */
+  offered: boolean;
+};
+
+/** What the phone and our own record actually say. The one place that reads both. */
+export async function pushState(): Promise<PushState | null> {
+  const N = lib();
+  if (!N) return null;
+  try {
+    const [offered, perm] = await Promise.all([
+      AsyncStorage.getItem(OFFERED_KEY),
+      N.getPermissionsAsync(),
+    ]);
+    // Permission already exists, so the offer is spent whether or not this phone remembers
+    // being asked. Writing it down means a lost local store cannot resurrect the card.
+    if (perm.granted && !offered) await AsyncStorage.setItem(OFFERED_KEY, '1').catch(() => {});
+    return { granted: !!perm.granted, canAskAgain: !!perm.canAskAgain, offered: !!offered || !!perm.granted };
+  } catch {
+    return null;
+  }
+}
+
 /** True when there is a prompt left to show and we have not already used it. */
 export async function canOfferPush(): Promise<boolean> {
-  const N = lib();
-  if (!N) return false;
-  try {
-    if (await AsyncStorage.getItem(OFFERED_KEY)) return false;
-    const perm = await N.getPermissionsAsync();
-    return !perm.granted && perm.canAskAgain;
-  } catch {
-    return false;
-  }
+  const s = await pushState();
+  return !!s && !s.offered && !s.granted && s.canAskAgain;
 }
 
 /** Marks the offer as spent whatever the answer, so it is never raised twice. */

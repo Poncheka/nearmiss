@@ -3,10 +3,10 @@
 // Lives here rather than in the feed because the friend profile shows the same thing: the near
 // misses you two have, in the same shape, so moving between the two does not feel like looking
 // at two different apps.
-import { memo } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { memo, useEffect } from 'react';
+import { Animated, Easing, Image, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronRight, MessageCircle } from 'lucide-react-native';
+import { ChevronRight, MessageCircle, Sparkles } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { Body, Chip, ChipTone, UnreadDot } from '@/components/ui';
@@ -18,6 +18,28 @@ const openNearMiss = (id: string) => router.push({ pathname: '/near-miss/[id]', 
 
 const PASTELS = [pastel.lilac, pastel.peach, pastel.sage, pastel.butter, pastel.sky];
 const colorFor = (key: string) => PASTELS[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % PASTELS.length];
+
+/**
+ * One clock for every card that is waiting to be opened.
+ *
+ * Shared on purpose. A value per card means each one starts whenever it happened to mount, so a
+ * feed of them shimmers at random and reads as a glitch. Driven from here they breathe together,
+ * which reads as deliberate. It is also one timer rather than one per row, on the UI thread, so
+ * a long feed costs nothing.
+ */
+const pulse = new Animated.Value(0);
+let pulsing = false;
+function startPulse() {
+  if (pulsing) return;
+  pulsing = true;
+  Animated.loop(
+    Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]),
+  ).start();
+}
+const glow = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] });
 
 export function RealPair({ nm, size = 34 }: { nm: RealNearMiss; size?: number }) {
   const offset = Math.round(size * 0.62);
@@ -41,15 +63,32 @@ export const NearMissCard = memo(function NearMissCard({ nm, width, myBirthday }
   const mapHeight = Math.round(width * 0.72);
   const barely = isBarelyMissed(nm);
   const occasion = occasionFor(nm.closest_at, { mine: myBirthday, theirs: nm.other_birthday, theirName: nm.other_name });
+  // Never opened. The ribbon says it now, so it does not also need a chip in a row of five.
+  const fresh = nm.is_new;
+  useEffect(() => { if (fresh) startPulse(); }, [fresh]);
   const tags: { label: string; tone: ChipTone }[] = [];
-  if (nm.is_new) tags.push({ label: 'New', tone: 'violet' });
   tags.push({ label: kindLabel(nm), tone: nm.kind === 'crossed' ? 'violet' : 'outline' });
   if (occasion) tags.push({ label: occasion.label, tone: occasion.loud ? 'green' : 'outline' });
   if (nm.via_name) tags.push({ label: `Friend of ${nm.via_name.split(' ')[0]}`, tone: 'green' });
   if (nm.is_before_met) tags.push({ label: 'Before you met', tone: 'violet' });
   return (
-    <Pressable onPress={() => openNearMiss(nm.id)} accessibilityRole="button" accessibilityLabel={`${place}, you and ${name}, ${when.date}`}>
-      <View style={{ backgroundColor: colors.card, borderRadius: radius.cardLg, borderWidth: 1, borderColor: colors.cardBorder, overflow: 'hidden' }}>
+    <Pressable
+      onPress={() => openNearMiss(nm.id)}
+      accessibilityRole="button"
+      accessibilityLabel={`${fresh ? 'Unopened. ' : ''}${place}, you and ${name}, ${when.date}`}
+    >
+      <View style={{ backgroundColor: colors.card, borderRadius: radius.cardLg, borderWidth: 1, borderColor: fresh ? colors.violet : colors.cardBorder, overflow: 'hidden' }}>
+        {/* The one thing worth interrupting the feed for: something found for you that you have
+            not looked at yet. It gets the top of the card rather than a chip in the row below,
+            because a chip among four others is not news. */}
+        {fresh && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.violet, paddingHorizontal: 14, paddingVertical: 9 }}>
+            <Sparkles size={15} color={colors.white} strokeWidth={2.4} />
+            <Text style={{ fontFamily: fonts.bold, fontSize: 13, color: colors.white, letterSpacing: 0.2 }}>
+              New · you haven&apos;t seen this one
+            </Text>
+          </View>
+        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
           <RealPair nm={nm} />
           <View style={{ flex: 1 }}>
@@ -95,6 +134,17 @@ export const NearMissCard = memo(function NearMissCard({ nm, width, myBirthday }
           </View>
         </View>
       </View>
+      {/* Drawn over the card rather than on it, so the breathing is opacity alone and can run on
+          the UI thread. pointerEvents none keeps the whole card tappable through it. */}
+      {fresh && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            borderRadius: radius.cardLg, borderWidth: 2, borderColor: colors.violet, opacity: glow,
+          }}
+        />
+      )}
     </Pressable>
   );
 });

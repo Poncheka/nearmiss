@@ -6,31 +6,26 @@
 //
 // Either button spends the offer. Dismissing is an answer, and nagging is how "Not now" turns
 // into "never" in the system settings.
-import { useEffect, useState } from 'react';
+//
+// This used to decide for itself whether to appear, in state of its own. It sits in a FlatList
+// row, and a FlatList unmounts rows that scroll out of view and builds them again on the way
+// back, so "I have been answered" lasted only until it left the screen. The feed owns that
+// decision now: the row is not in the list at all unless there is an offer to make, and
+// answering removes it. This component just draws the card.
 import { Pressable, View } from 'react-native';
 import { Bell, X } from 'lucide-react-native';
 import { Body, Card, IconTile } from '@/components/ui';
-import { askForPush, canOfferPush, offerDeclined } from '@/lib/push';
+import { askForPush, offerDeclined } from '@/lib/push';
 import { colors, radius } from '@/theme';
 
-export function PushOffer() {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    let live = true;
-    canOfferPush().then((can) => { if (live) setShow(can); }).catch(() => {});
-    return () => { live = false; };
-  }, []);
-
-  if (!show) return null;
-
+export function PushOffer({ onAnswered }: { onAnswered?: () => void }) {
   const yes = async () => {
-    setShow(false);
+    onAnswered?.();
     await askForPush();
   };
 
   const no = async () => {
-    setShow(false);
+    onAnswered?.();
     await offerDeclined();
   };
 
