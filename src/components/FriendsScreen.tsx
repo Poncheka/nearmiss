@@ -6,7 +6,7 @@ import { Body, Button, Card, Display, Pill, ProgressDots, Screen, SectionLabel }
 import { Avatar } from '@/components/avatar';
 import { ActivityButton } from '@/components/ActivityButton';
 import { contactsOnApp, inviteContacts, people } from '@/data/mock';
-import { AppUser, chooseMoreContacts, findByUsername, FriendStatus, PhoneContact, sendInvite, useContacts } from '@/lib/contacts';
+import { AppUser, chooseMoreContacts, FriendStatus, PhoneContact, searchUsers, sendInvite, useContacts } from '@/lib/contacts';
 import { useAuth } from '@/lib/auth';
 import { colors, fonts, pastel, radius } from '@/theme';
 
@@ -31,7 +31,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [demoStatus, setDemoStatus] = useState<Record<string, FriendStatus>>({ sam: 'friends' });
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [found, setFound] = useState<AppUser | null>(null);
+  const [found, setFound] = useState<AppUser[]>([]);
 
   useEffect(() => {
     if (demo) return;
@@ -52,15 +52,17 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     else useContacts.getState().refreshFriends();
   }, [demo]));
 
-  // Typing a username looks that person up, so you can add someone who isn't in your contacts.
+  // Typing a username searches everyone, not just your contacts. Contact matching only works
+  // when your address book holds the exact address someone signed up with, which for most
+  // people it does not, so this is the path that actually reaches them.
   useEffect(() => {
     if (demo) return;
     const handle = q.trim().replace(/^@/, '').toLowerCase();
-    if (!/^[a-z0-9_.]{3,24}$/.test(handle)) { setFound(null); return; }
+    if (!/^[a-z0-9_.]{3,24}$/.test(handle)) { setFound([]); return; }
     let live = true;
     const t = setTimeout(() => {
-      findByUsername(handle).then((u) => { if (live) setFound(u); }).catch(() => {});
-    }, 350);
+      searchUsers(handle).then((u) => { if (live) setFound(u); }).catch(() => {});
+    }, 300);
     return () => { live = false; clearTimeout(t); };
   }, [q, demo]);
 
@@ -68,11 +70,13 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const hasAccess = access === 'granted' || access === 'limited';
   const statuses = demo ? demoStatus : c.statuses;
 
-  const query = q.trim().toLowerCase();
+  // The @ is how people type a username and is in none of the names it gets compared against,
+  // so leaving it on filtered the person out of the list they had just been found for.
+  const query = q.trim().replace(/^@/, '').toLowerCase();
   const sections = useMemo(() => {
     const users = new Map<string, AppUser>();
     for (const u of demo ? demoOnApp : c.onApp) users.set(u.id, u);
-    if (found) users.set(found.id, found);
+    for (const u of found) users.set(u.id, u);
     if (!demo) for (const f of c.friends) if (!users.has(f.id)) users.set(f.id, f);
     const match = (s: string) => !query || s.toLowerCase().includes(query);
     const userRows = [...users.values()]
@@ -85,6 +89,10 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     // Shortcodes and nameless rows are dropped from browsing but stay findable: a search for
     // something specific should still turn them up.
     const contactRows = (demo ? demoContacts : c.contacts)
+      // Someone whose address matched an account is listed above, with an Add. Offering them
+      // again down here with an Invite is how you end up texting a signup link to someone who
+      // is already using the app.
+      .filter((p) => !p.onApp)
       .filter((p) => (query ? true : p.browsable))
       .filter((p) => match(`${p.name} ${p.phone ?? ''} ${p.email ?? ''}`));
     const out: { key: string; title: string; data: Row[] }[] = [];

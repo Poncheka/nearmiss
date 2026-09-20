@@ -116,9 +116,6 @@ export default function PhotoViewer() {
   }
 
   const who = current?.mine ? 'You' : (current?.owner_name?.split(' ')[0] ?? name);
-  const stamp = current
-    ? new Date(current.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-    : '';
 
   return (
     <View style={{ flex: 1 }} {...pan.panHandlers}>
@@ -144,7 +141,7 @@ export default function PhotoViewer() {
                 <ActivityIndicator color={colors.white} />
               </View>
             ) : photo.isVideo ? (
-              <SharedVideo uri={photo.url} width={width} height={frameHeight} />
+              <SharedVideo uri={photo.url} width={width} height={frameHeight} contentFit="contain" />
             ) : (
               // Zooming is per photo, so pinching one doesn't leave the next one scaled.
               <ScrollView
@@ -181,10 +178,22 @@ export default function PhotoViewer() {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Body size={15} weight="bold" color={colors.white} numberOfLines={1}>{who}</Body>
-          <Body size={12} color="rgba(255,255,255,0.65)" numberOfLines={1}>{stamp}</Body>
         </View>
-        {photos.length > 1 ? (
-          <Body size={13} color="rgba(255,255,255,0.65)">{page + 1} of {photos.length}</Body>
+        {/* Where you are in the set, as dots rather than "3 of 5". You can see how many there
+            are and which one this is without being handed arithmetic. Past a handful the count
+            stops being the interesting part, so the dots stop too. */}
+        {photos.length > 1 && photos.length <= 8 ? (
+          <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
+            {photos.map((p, i) => (
+              <View
+                key={p.id}
+                style={{
+                  width: 6, height: 6, borderRadius: 3,
+                  backgroundColor: i === page ? colors.white : 'rgba(255,255,255,0.35)',
+                }}
+              />
+            ))}
+          </View>
         ) : null}
         {current?.mine ? (
           <Pressable

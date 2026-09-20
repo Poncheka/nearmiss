@@ -117,6 +117,33 @@ function getGoogle(): GoogleModule {
 }
 
 
+/**
+ * What actually went wrong with Sign in with Apple, in a sentence.
+ *
+ * The codes come straight from Apple's ASAuthorizationError. ERR_REQUEST_UNKNOWN is the one
+ * worth spelling out: on an app that is correctly entitled, and this one provably is, it almost
+ * always means something about the Apple ID on the device rather than the app, and two-factor
+ * being off is far and away the most common of those.
+ */
+function appleMessage(code?: string): string {
+  switch (code) {
+    case 'ERR_REQUEST_UNKNOWN':
+      return 'Apple turned down the sign-in without saying why. This usually means the Apple ID on this iPhone does not have two-factor authentication turned on, or is not signed in to iCloud in Settings.';
+    case 'ERR_REQUEST_NOT_HANDLED':
+      return 'iPhone could not complete the sign-in. Signing out of iCloud and back in usually clears this.';
+    case 'ERR_REQUEST_NOT_INTERACTIVE':
+      return 'The sign-in could not be shown. Bring Near Miss to the front and try again.';
+    case 'ERR_INVALID_RESPONSE':
+    case 'ERR_INVALID_OPERATION':
+    case 'ERR_INVALID_SCOPE':
+      return 'Apple sent back something Near Miss could not read. This is our problem, not yours.';
+    case 'ERR_REQUEST_FAILED':
+      return 'The sign-in failed. Check your connection and try again.';
+    default:
+      return 'Apple could not complete the sign-in.';
+  }
+}
+
 const demoProfile: Profile = { id: 'demo', username: 'jeff', name: 'Jeff', bio: 'SF. Always at the show.', avatar_url: null, birthday: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -221,12 +248,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
       });
     } catch (e: unknown) {
-      if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return;
-      throw e;
+      const code = (e as { code?: string }).code;
+      if (code === 'ERR_REQUEST_CANCELED') return;
+      // Apple's own failure, before we ever reach our server. This used to surface as a raw
+      // exception with a stack trace in it, which told the person nothing and told us almost as
+      // little. Saying which stage failed and carrying the code is the difference between "it
+      // doesn't work" and something anyone can act on.
+      console.warn('Apple sign-in refused', code, e);
+      throw new UserFacingError(`${appleMessage(code)} (Apple: ${code ?? 'no code'})`);
     }
     if (!credential.identityToken) throw new UserFacingError('Apple did not return a sign-in token. Try again.');
     const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token: credential.identityToken });
-    if (error) throw new UserFacingError(`Supabase: ${error.message}`);
+    // Apple said yes and we were turned away at our own door, which is a different problem with
+    // a different fix, so it has to read differently.
+    if (error) throw new UserFacingError(`Apple signed you in, but Near Miss could not accept it: ${error.message}`);
     // Apple only shares the name on the very first sign-in.
     const given = credential.fullName?.givenName;
     if (given && data.user) {

@@ -30,6 +30,8 @@ export type PhoneContact = {
   emailHashes: string[];
   /** False for shortcodes and nameless rows: still searchable, just not worth browsing. */
   browsable: boolean;
+  /** This contact turned out to have an account, so they want adding rather than inviting. */
+  onApp?: boolean;
 };
 
 export type AppUser = { id: string; username: string | null; name: string | null; avatar_url: string | null; contactName?: string };
@@ -62,6 +64,10 @@ async function loadHashMemo() {
 }
 
 const idle = () => new Promise<void>((r) => setTimeout(r, 0));
+
+/** How long a read of the address book stays good enough to reuse on a tab switch. */
+const LOAD_EVERY_MS = 5 * 60 * 1000;
+let lastLoadedAt = 0;
 
 /**
  * Noticing that someone you know has turned up.
@@ -266,6 +272,13 @@ export const useContacts = create<ContactsState>((set, get) => ({
   },
   load: async (ask = false) => {
     if (get().loading) return;
+    // Opening Search re-read the entire address book across the native bridge every single
+    // time, which is why moving between tabs dragged. The answer does not change minute to
+    // minute, so a recent read is reused and an explicit ask always goes through.
+    if (!ask && lastLoadedAt && Date.now() - lastLoadedAt < LOAD_EVERY_MS) {
+      get().refreshFriends();
+      return;
+    }
     // 'loading' drives a spinner, but only when there is nothing to look at yet. A refresh
     // behind a list that is already on screen should be silent.
     set({ loading: true, error: null });
@@ -285,15 +298,29 @@ export const useContacts = create<ContactsState>((set, get) => ({
 
       const hashes = [...new Set(await hashAll(contacts.flatMap((c) => c.emails)))];
       const found = new Map<string, AppUser>();
+      // Which addresses came back matched, so the same person cannot be listed twice: once to
+      // add and once to invite. The invite is the one that gets pressed, which is how someone
+      // ends up sending a signup link to a friend who is already here.
+      const matched = new Set<string>();
       for (let i = 0; i < hashes.length; i += 2000) {
         const { data, error } = await supabase.rpc('find_contacts_on_app', { hashes: hashes.slice(i, i + 2000) });
         if (error) throw new Error(error.message);
-        for (const u of (data ?? []) as AppUser[]) found.set(u.id, u);
+        for (const u of (data ?? []) as (AppUser & { hash?: string })[]) {
+          found.set(u.id, u);
+          if (u.hash) matched.add(u.hash);
+        }
+      }
+      if (matched.size) {
+        const byEmail = await hashAll(contacts.flatMap((c) => c.emails));
+        const all = contacts.flatMap((c) => c.emails);
+        const hashOf = new Map(all.map((e, i) => [e, byEmail[i]]));
+        for (const c of contacts) c.onApp = c.emails.some((e) => matched.has(hashOf.get(e) ?? ''));
       }
       const onApp = [...found.values()].sort((a, b) => (a.name ?? a.username ?? '').localeCompare(b.name ?? b.username ?? ''));
       set({ onApp });
       // Next time this tab opens, it opens on this.
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ contacts, onApp })).catch(() => {});
+      lastLoadedAt = Date.now();
       await noteArrivals(onApp, get().statuses);
     } catch (e) {
       console.warn('Loading contacts failed', e);
@@ -349,11 +376,25 @@ export const useContacts = create<ContactsState>((set, get) => ({
     // a few seconds of work we should be paying.
     AsyncStorage.multiRemove([CACHE_KEY, HASH_KEY, SEEN_KEY, DISMISSED_KEY]).catch(() => {});
     memo.clear();
+    lastLoadedAt = 0;
     set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], hydrated: false, arrivals: [] });
   },
 }));
 
 /** Find someone by their exact @username (for adding a friend who isn't in your contacts). */
+/**
+ * Anyone, by username.
+ *
+ * The way to reach someone whose address book entry has their phone number but not the address
+ * they signed up with, which is most people. Contact matching cannot help there, and without
+ * this the only offer was an invite link to someone already using the app.
+ */
+export async function searchUsers(q: string): Promise<AppUser[]> {
+  const { data, error } = await supabase.rpc('search_users', { q });
+  if (error) return [];
+  return (data ?? []) as AppUser[];
+}
+
 export async function findByUsername(handle: string): Promise<AppUser | null> {
   const clean = handle.trim().replace(/^@/, '').toLowerCase();
   if (!/^[a-z0-9_.]{3,24}$/.test(clean)) return null;
