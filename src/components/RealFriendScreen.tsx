@@ -313,7 +313,7 @@ export function RealFriendScreen({ id }: { id: string }) {
               </>
             ) : (
               <Body size={14} color={colors.muted}>
-                Near misses appear once you have both scanned your photos. Anything from the last 30 days
+                Near misses appear once you have both scanned your photos. Anything from the last two days
                 is never matched.
               </Body>
             )}

@@ -63,6 +63,46 @@ async function loadHashMemo() {
 
 const idle = () => new Promise<void>((r) => setTimeout(r, 0));
 
+/**
+ * Noticing that someone you know has turned up.
+ *
+ * This has to happen on the phone, and that is not a shortcut. The server is never told who is
+ * in your address book: your own address is registered so people can find you, and matching runs
+ * the other way, with this phone hashing its contacts and asking whether any of them have an
+ * account. So "Maya joined" is a fact only this device is in a position to notice, which is the
+ * price of the contacts never leaving it. It also means this is found when the app is opened
+ * rather than pushed the moment it happens.
+ *
+ * The first run records who is already here and announces nobody, or signing in would greet you
+ * with news that thirty people you know "just joined".
+ */
+const SEEN_KEY = 'nearmiss.contacts.seen.v1';
+const DISMISSED_KEY = 'nearmiss.contacts.arrivals.dismissed.v1';
+
+async function noteArrivals(onApp: AppUser[], statuses: Record<string, FriendStatus>) {
+  try {
+    const raw = await AsyncStorage.getItem(SEEN_KEY);
+    const ids = onApp.map((u) => u.id);
+    await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(ids));
+    if (!raw) return; // First look. Everyone is "new" and none of it is news.
+    const seen = new Set(JSON.parse(raw) as string[]);
+    const dismissed = new Set(JSON.parse((await AsyncStorage.getItem(DISMISSED_KEY)) ?? '[]') as string[]);
+    // Someone you have already added, or already asked, is not an arrival worth a row.
+    const fresh = onApp.filter((u) => !seen.has(u.id) && !dismissed.has(u.id) && !statuses[u.id]);
+    if (fresh.length) useContacts.setState((s) => ({ arrivals: [...fresh, ...s.arrivals.filter((a) => !fresh.some((f) => f.id === a.id))] }));
+  } catch { /* a missing note just means no announcement */ }
+}
+
+/** Stops it being offered again, whether it was acted on or waved away. */
+export async function dismissArrival(id: string) {
+  useContacts.setState((s) => ({ arrivals: s.arrivals.filter((a) => a.id !== id) }));
+  try {
+    const raw = (await AsyncStorage.getItem(DISMISSED_KEY)) ?? '[]';
+    const list = JSON.parse(raw) as string[];
+    if (!list.includes(id)) await AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify([...list, id].slice(-200)));
+  } catch { /* it will simply be offered once more */ }
+}
+
 async function hashAll(emails: string[]): Promise<string[]> {
   await loadHashMemo();
   const out: string[] = [];
@@ -184,6 +224,8 @@ type ContactsState = {
   /** True once contact matching has been turned off on this account. */
   unlinked: boolean;
   /** Stop being findable by phone or email, and forget the address book held here. */
+  /** Contacts who turned up on Near Miss since this phone last looked. */
+  arrivals: AppUser[];
   unlink: () => Promise<void>;
   reset: () => void;
 };
@@ -252,6 +294,7 @@ export const useContacts = create<ContactsState>((set, get) => ({
       set({ onApp });
       // Next time this tab opens, it opens on this.
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ contacts, onApp })).catch(() => {});
+      await noteArrivals(onApp, get().statuses);
     } catch (e) {
       console.warn('Loading contacts failed', e);
       set({ error: e instanceof Error ? e.message : String(e) });
@@ -292,6 +335,8 @@ export const useContacts = create<ContactsState>((set, get) => ({
     await AsyncStorage.setItem(UNLINKED_KEY, '1').catch(() => {});
   },
 
+  arrivals: [],
+
   reset: () => {
     // onApp is about this account, not this phone: leaving it cached would show the next person
     // to sign in on this handset a flash of the previous person's matches.
@@ -302,9 +347,9 @@ export const useContacts = create<ContactsState>((set, get) => ({
     // stayed on disk for whoever signed in next. unlink() always cleared both. Signing out now
     // does the same. The cost is that the next sign-in hashes the address book again, which is
     // a few seconds of work we should be paying.
-    AsyncStorage.multiRemove([CACHE_KEY, HASH_KEY]).catch(() => {});
+    AsyncStorage.multiRemove([CACHE_KEY, HASH_KEY, SEEN_KEY, DISMISSED_KEY]).catch(() => {});
     memo.clear();
-    set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], hydrated: false });
+    set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], hydrated: false, arrivals: [] });
   },
 }));
 

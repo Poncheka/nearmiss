@@ -230,7 +230,7 @@ function PhotoData({ demo }: { demo: boolean }) {
         </Row>
       ) : null}
       <Row last>
-        <Label title="Recent photos" sub="Photos from the last 30 days are never matched" />
+        <Label title="Recent photos" sub="Photos from the last two days are never matched" />
       </Row>
     </Group>
   );

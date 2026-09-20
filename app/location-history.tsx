@@ -213,7 +213,7 @@ export default function LocationHistory() {
           <Body size={14} color={colors.muted}>
             Only the places you stopped, with the times you were there. The routes between them are
             skipped on purpose: two strangers passing on a freeway is true and worth nothing, and it
-            would bury the near misses that matter. Anything from the last 30 days is left out, the
+            would bury the near misses that matter. Anything from the last two days is left out, the
             same as with photos.
           </Body>
         </Card>

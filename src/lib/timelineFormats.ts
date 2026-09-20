@@ -21,8 +21,8 @@ const MIN_VISIT_MS = 5 * 60 * 1000;
 const STEP_MS = 10 * 60 * 1000;
 /** Nobody stands still for a day; a visit longer than this is Google being confused. */
 const MAX_VISIT_MS = 8 * 60 * 60 * 1000;
-/** Same rule as photos: nothing from the last 30 days. */
-const RECENT_DAYS = 30;
+/** Same rule as photos: nothing from the last two days. */
+const RECENT_DAYS = 2;
 const UPLOAD_BATCH = 500;
 
 const isLat = (n: number) => Number.isFinite(n) && n >= -90 && n <= 90;

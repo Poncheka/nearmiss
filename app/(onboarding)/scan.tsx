@@ -194,7 +194,7 @@ export default function Scan() {
               <>
                 <Display size={32}>No photos with a place yet</Display>
                 <Body size={17} color={colors.text2}>
-                  We didn't find photos older than 30 days with location on. Turn on Location for the Camera app and your future photos will count.
+                  We didn't find photos older than two days with location on. Turn on Location for the Camera app and your future photos will count.
                 </Body>
               </>
             )}

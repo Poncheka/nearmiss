@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 import { IconButton } from '@/components/ui';
 import { useActivity } from '@/lib/activity';
+import { useContacts } from '@/lib/contacts';
 import { useAuth } from '@/lib/auth';
 import { useStore } from '@/state/store';
 import { activity as demoActivity } from '@/data/mock';
@@ -17,9 +18,13 @@ export function ActivityButton() {
   const { demo } = useAuth();
   const realUnread = useActivity((s) => s.unread);
   const demoRead = useStore((s) => s.activityRead);
+  // Contacts who have turned up are only known to this phone, so they are counted here rather
+  // than coming back from the server with everything else. Without this the bell stays quiet and
+  // the one place that shows them is the one place nobody is told to look.
+  const arrivals = useContacts((st) => st.arrivals.length);
   const unread = demo
     ? (demoRead ? 0 : demoActivity.filter((a) => a.fresh).length)
-    : realUnread;
+    : realUnread + arrivals;
 
   return (
     <View>

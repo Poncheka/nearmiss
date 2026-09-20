@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 
-export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed' | 'reaction' | 'nudge';
+export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed' | 'reaction' | 'nudge' | 'invite_joined' | 'friend_joined';
 
 export type RealActivity = {
   id: string;
@@ -69,6 +69,8 @@ export function activityText(a: RealActivity): string {
     // Says what it is for, not just that it happened. "Nudged you" on its own reads as a poke
     // with no obvious response; this one names the thing to do.
     case 'nudge': return 'is waiting on your photos';
+    case 'invite_joined': return 'joined from your invite';
+    case 'friend_joined': return 'is on Near Miss';
     default: return 'did something';
   }
 }

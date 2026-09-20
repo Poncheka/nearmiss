@@ -338,7 +338,7 @@ export default function Feed() {
   const footer = empty ? null : (
     <View style={{ alignItems: 'center', gap: 6, paddingTop: 12, paddingHorizontal: 12 }}>
       <Body size={14} color={colors.muted} style={{ textAlign: 'center' }}>
-        That's every near miss so far. More show up as friends join. Photos from the last 30 days are never matched.
+        That's every near miss so far. More show up as friends join. Photos from the last two days are never matched.
       </Body>
       <Pressable onPress={() => router.navigate('/invite')} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Body size={15} weight="bold" color={colors.violet}>Invite friends</Body>

@@ -54,7 +54,7 @@ export const useScan = create<ScanState>((set, get) => ({
     const stats = await getScanStats();
     if (stats) set({ stats });
   },
-  // Quietly picks up photos that have aged past 30 days since the last scan.
+  // Quietly picks up photos that have aged past the recency line since the last scan.
   // Runs at most every 12 hours, only for people who already scanned and still allow full access.
   autoScan: async () => {
     try {

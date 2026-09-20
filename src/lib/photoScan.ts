@@ -1,5 +1,5 @@
 // Reads where and when your photos and videos were taken and saves just that (never the file) to
-// Supabase. Anything from the last 30 days is skipped. Hidden places (home, work) are dropped by
+// Supabase. Anything from the last two days is skipped. Hidden places (home, work) are dropped by
 // the database.
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 type ML = typeof import('expo-media-library');
 
 const DAY = 24 * 60 * 60 * 1000;
-export const RECENT_DAYS = 30;
+export const RECENT_DAYS = 2;
 const PAGE = 300;
 const CONCURRENCY = 12;
 const UPLOAD_BATCH = 500;
@@ -17,7 +17,7 @@ export type Access = 'granted' | 'limited' | 'denied' | 'undetermined' | 'unavai
 
 export type ScanProgress = {
   phase: 'counting' | 'reading' | 'saving' | 'grouping' | 'done';
-  total: number;      // photos older than 30 days on the phone
+  total: number;      // photos older than the recency line on the phone
   scanned: number;    // photos looked at in this run (plus earlier runs)
   withLocation: number;
   oldest: number | null; // ms
@@ -153,8 +153,12 @@ async function upload(uid: string, points: { id: string; t: number; lat: number;
 }
 
 /**
- * Scans the library. First run reads everything older than 30 days (newest first, resumable).
- * Later runs read photos that have aged past 30 days since last time, then finish any unread older ones.
+ * Scans the library. First run reads everything older than the recency line (newest first,
+ * resumable). Later runs read photos that have aged past it since last time, then finish any
+ * unread older ones.
+ *
+ * Shortening RECENT_DAYS is picked up on its own: step 1 reads from the new line back to the old
+ * one, which is exactly the window that used to be skipped. No cursor reset needed.
  */
 export async function scanPhotos(opts: { onProgress?: (p: ScanProgress) => void; signal?: { cancelled: boolean } } = {}): Promise<ScanResult> {
   const ML = lib();
@@ -220,14 +224,14 @@ export async function scanPhotos(opts: { onProgress?: (p: ScanProgress) => void;
     }
   };
 
-  // 1. New since last time: photos that crossed the 30-day line since the last scan.
+  // 1. New since last time: photos that crossed the recency line since the last scan.
   if (cur.complete || cur.oldest != null) {
     const since = cur.newest ?? cutoff;
     if (since < cutoff) await run(cutoff, since, () => {});
     if (opts.signal?.cancelled) return finish(false);
     cur.newest = cutoff;
   }
-  // 2. Older photos not read yet. The first run starts at the 30-day line and works back.
+  // 2. Older photos not read yet. The first run starts at the recency line and works back.
   if (!cur.complete) {
     cur.newest = cur.newest ?? cutoff;
     await run(cur.oldest ?? cutoff, null, (oldestInPage) => {
