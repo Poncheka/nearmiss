@@ -67,6 +67,45 @@ export function ScanArt() {
   );
 }
 
+/**
+ * Location illustration: one pin, dropped once, with a place marked private beside it.
+ *
+ * Drawn to say what the screen says. The pin is a single point rather than a trail, because the
+ * whole promise is that this is read once when asked for and never followed, and the covered
+ * house is the reason anyone would say yes to it. Same flat shapes, same ink outline and the
+ * same coral pin as the photo screen, so the two steps look like one app.
+ */
+export function LocationArt() {
+  return (
+    <Svg width={260} height={220} viewBox="0 0 260 220" fill="none">
+      <Defs>
+        {/* Roads drawn past the edge and clipped back, so they end at the card rather than
+            stopping short of it or poking out through the rounded corners. */}
+        <ClipPath id="la-map"><Rect x={26} y={30} width={208} height={160} rx={20} /></ClipPath>
+      </Defs>
+      <Rect x={26} y={30} width={208} height={160} rx={20} fill={colors.white} />
+      <G clipPath="url(#la-map)">
+        <Path d="M18 140 L86 116 L168 150 L242 122" stroke={colors.sandDeep} strokeWidth={9} strokeLinecap="round" />
+        <Path d="M78 22 L78 198" stroke={colors.sandDeep} strokeWidth={9} strokeLinecap="round" />
+        <Rect x={96} y={42} width={40} height={26} rx={8} fill={colors.violetTint} />
+        <Rect x={150} y={150} width={60} height={32} rx={8} fill={colors.violetTint} />
+      </G>
+      <Rect x={26} y={30} width={208} height={160} rx={20} stroke={colors.ink} strokeWidth={1.5} />
+
+      {/* Read once: a single point, with the accuracy it actually has. Not a trail. */}
+      <Circle cx={164} cy={88} r={34} fill={colors.violetTint} opacity={0.9} />
+      <Path d="M164 50c-13 0-22 9.5-22 21.5C142 88 164 110 164 110s22-22 22-38.5C186 59.5 177 50 164 50z" fill={colors.coral} stroke={colors.ink} strokeWidth={1.5} />
+      <Circle cx={164} cy={72} r={7} fill={colors.white} />
+
+      {/* A hidden place, drawn the way the app stores one: somewhere, and a radius around it. */}
+      <Circle cx={68} cy={146} r={29} fill={colors.greenTint} stroke={colors.ink} strokeWidth={1.5} strokeDasharray="5 6" strokeLinecap="round" />
+      <Path d="M54 146 L68 134 L82 146" stroke={colors.ink} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M58 146 V160 H78 V146" stroke={colors.ink} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Rect x={65} y={152} width={7} height={8} fill={colors.ink} />
+    </Svg>
+  );
+}
+
 /** Stand-in photo (concert-like silhouette on a flat color). */
 export function PhotoArt({ color, size }: { color: string; size: number }) {
   return (

@@ -98,7 +98,7 @@ export default function Scan() {
       <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 22 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <IconButton label={step === 'intro' ? 'Sign out' : 'Back'} onPress={back}><ChevronLeft size={20} color={colors.ink} /></IconButton>
-          <ProgressDots total={3} active={1} />
+          <ProgressDots total={4} active={1} />
           <View style={{ width: 44 }} />
         </View>
 

@@ -9,10 +9,10 @@ export default function OnboardingLayout() {
       <Stack.Screen name="scan" options={{ gestureEnabled: false }} />
       <Stack.Screen name="profile" />
       <Stack.Screen name="find-friends" />
-      {/* Location is no longer part of onboarding. Asking for someone's ongoing whereabouts in
-          the first two minutes, before the app has shown them anything, is asking for trust it
-          has not earned yet. It lives in Settings and we can ask again once it has. */}
-      <Stack.Screen name="turn-on-location" options={{ gestureEnabled: false }} />
+      {/* Last, and optional. It is also the only screen that marks onboarding finished, so
+          every route through here has to end on it: both of its buttons call finishOnboarding,
+          and nothing else does. */}
+      <Stack.Screen name="turn-on-location" />
     </Stack>
   );
 }

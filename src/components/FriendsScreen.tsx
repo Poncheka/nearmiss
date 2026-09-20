@@ -25,7 +25,7 @@ const demoContacts: PhoneContact[] = inviteContacts.map((c) => ({ id: c.id, name
 type Row = { kind: 'user'; user: AppUser } | { kind: 'contact'; contact: PhoneContact };
 
 export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) {
-  const { profile, demo, finishOnboarding } = useAuth();
+  const { profile, demo } = useAuth();
   const c = useContacts();
   const [q, setQ] = useState('');
   const [invited, setInvited] = useState<Record<string, boolean>>({});
@@ -105,12 +105,10 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     }
   };
 
-  // This is the last onboarding step now that location has moved to Settings, so this is what
-  // marks it finished. Miss this and a new account loops back to step one forever.
-  const done = async () => {
-    try { await finishOnboarding(); } catch { /* the app opens anyway */ }
-    router.replace('/');
-  };
+  // Location is the last step again, and it is the only screen that marks onboarding finished.
+  // This one hands off to it rather than finishing here, or someone would land in the app
+  // having never been asked.
+  const done = () => router.push('/turn-on-location');
 
   const invite = async (p: PhoneContact) => {
     setInvited((s) => ({ ...s, [p.id]: true }));
@@ -167,8 +165,8 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
         {onboarding && (
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
             <View style={{ width: 44 }} />
-            <ProgressDots total={3} active={3} />
-            <Pill label="Done" variant="ink" height={40} onPress={done} />
+            <ProgressDots total={4} active={3} />
+            <Pill label="Next" variant="ink" height={40} onPress={done} />
           </View>
         )}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 44 }}>
