@@ -108,7 +108,7 @@ export default function Scan() {
               <ScanArt />
             </View>
             <View style={{ gap: 10 }}>
-              <Display size={34}>Connect your photo history</Display>
+              <Display size={34}>Link your photo data, not your photos</Display>
               <Body size={17} color={colors.text2}>
                 We use the time and location attached to your photos to find when you and your
                 friends were nearby.

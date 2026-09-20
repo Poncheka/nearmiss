@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, Linking, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Body, Button, Display, Screen, TextLink, Wordmark } from '@/components/ui';
 import { WelcomeArt } from '@/components/art';
 import { errorMessage, getGoogleButton, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
 import { colors, radius } from '@/theme';
+
+/** Google's own value for the wide button style (standard is 0, icon only is 2). */
+const GOOGLE_BUTTON_WIDE = 1;
+
+const PRIVACY_URL = 'https://nearmiss.io/privacy';
+const TERMS_URL = 'https://nearmiss.io/terms';
 
 export default function Welcome() {
   const { signInWithApple, signInWithGoogle, startDemo } = useAuth();
@@ -50,7 +56,7 @@ export default function Welcome() {
           <WelcomeArt />
         </View>
         <View style={{ gap: 12 }}>
-          <Display size={42} style={{ lineHeight: 43 }}>who did you almost meet?</Display>
+          <Display size={42} style={{ lineHeight: 43 }}>when did you almost meet?</Display>
           <Body size={17} color={colors.text2}>See the times you and your friends were steps apart, sometimes years before you met.</Body>
         </View>
         <View style={{ gap: 10, paddingTop: 28 }}>
@@ -69,7 +75,11 @@ export default function Welcome() {
               is theirs rather than an approximation of it. */}
           {googleAvailable && GoogleButton
             ? <GoogleButton
-                size={GoogleButton.Size.Wide}
+                // Wide, spelled out. The component reads its size constants from the native
+                // module, and when that lookup comes back empty every constant is undefined,
+                // which its own switch matches against the icon case first and draws the small
+                // square. 1 is Google's own value for the wide style, so this says it either way.
+                size={GoogleButton.Size?.Wide ?? GOOGLE_BUTTON_WIDE}
                 color={GoogleButton.Color.Light}
                 onPress={google}
                 style={{ width: '100%', height: 54 }}
@@ -83,10 +93,9 @@ export default function Welcome() {
             <Body size={12} color={colors.muted} style={{ textAlign: 'center' }}>Apple and Google sign-in appear in the installed Near Miss app, not in Expo Go.</Body>
           )}
           <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-            <Body size={13} color={colors.muted}>18+ only ·</Body>
-            <TextLink label="Privacy" size={13} />
+            <TextLink label="Privacy" size={13} onPress={() => Linking.openURL(PRIVACY_URL)} />
             <Body size={13} color={colors.muted}>·</Body>
-            <TextLink label="Terms" size={13} />
+            <TextLink label="Terms" size={13} onPress={() => Linking.openURL(TERMS_URL)} />
           </View>
         </View>
       </View>

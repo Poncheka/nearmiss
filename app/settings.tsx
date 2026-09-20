@@ -387,6 +387,7 @@ export default function SettingsScreen() {
             <ChevronRight size={16} color={colors.faint} />
           </Row>
           <Row><TextLink label="Privacy policy" color={colors.ink} onPress={() => Linking.openURL('https://nearmiss.io/privacy')} /></Row>
+          <Row><TextLink label="Terms of use" color={colors.ink} onPress={() => Linking.openURL('https://nearmiss.io/terms')} /></Row>
           <Row><TextLink label={demo ? 'Leave sample data' : 'Sign out'} color={colors.ink} onPress={confirmSignOut} /></Row>
           <Row last><TextLink label="Delete my account" color={colors.danger} onPress={() => router.push('/delete-account')} /></Row>
         </Group>

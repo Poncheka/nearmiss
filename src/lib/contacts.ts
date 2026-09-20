@@ -295,7 +295,15 @@ export const useContacts = create<ContactsState>((set, get) => ({
   reset: () => {
     // onApp is about this account, not this phone: leaving it cached would show the next person
     // to sign in on this handset a flash of the previous person's matches.
-    AsyncStorage.removeItem(CACHE_KEY).catch(() => {});
+    //
+    // The hash table goes too, and this is the part that was wrong. Its keys are the addresses
+    // and numbers themselves, in the clear, so it is a copy of the address book that was
+    // outliving the account it was read for: sign out, or delete the account outright, and it
+    // stayed on disk for whoever signed in next. unlink() always cleared both. Signing out now
+    // does the same. The cost is that the next sign-in hashes the address book again, which is
+    // a few seconds of work we should be paying.
+    AsyncStorage.multiRemove([CACHE_KEY, HASH_KEY]).catch(() => {});
+    memo.clear();
     set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], hydrated: false });
   },
 }));

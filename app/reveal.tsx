@@ -84,7 +84,7 @@ export default function Reveal() {
                 <Display size={34} style={{ color: colors.white }}>Jeff and Maya were 22m apart at the Fillmore.</Display>
                 <Body size={17} color="rgba(255,255,255,0.9)">March 4, 2016. Three years before they met.</Body>
                 <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.25)', paddingTop: 12 }}>
-                  <Body size={14} color="rgba(255,255,255,0.75)">Who did you almost meet? · [domain]</Body>
+                  <Body size={14} color="rgba(255,255,255,0.75)">When did you almost meet? · [domain]</Body>
                 </View>
               </View>
               <Body size={14} color={colors.muted} style={{ textAlign: 'center' }}>Only the place and date are shared, never your path.</Body>
