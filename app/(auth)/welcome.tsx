@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, View } from 'react-native';
+import { Alert, Image, Linking, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Body, Button, Display, Screen, TextLink, Wordmark } from '@/components/ui';
 import { WelcomeArt } from '@/components/art';
-import { errorMessage, getGoogleButton, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
+import { errorMessage, googleAvailable, inExpoGo, useAuth } from '@/lib/auth';
 import { colors, radius } from '@/theme';
-
-/** Google's own value for the wide button style (standard is 0, icon only is 2). */
-const GOOGLE_BUTTON_WIDE = 1;
 
 const PRIVACY_URL = 'https://nearmiss.io/privacy';
 const TERMS_URL = 'https://nearmiss.io/terms';
@@ -21,9 +18,6 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false);
   // Apple and Google sign-in aren't included in Expo Go; they work in development and App Store builds.
   const isIOS = Platform.OS === 'ios' && !inExpoGo;
-  // Loaded through the same lazy require as the rest of the Google module, so Expo Go (which
-  // has no native side for it) still starts.
-  const GoogleButton = googleAvailable ? getGoogleButton() : null;
 
   useEffect(() => {
     if (!isIOS) return;
@@ -70,30 +64,21 @@ export default function Welcome() {
             />
           )}
           {isIOS && nativeApple === false && <Button label="Continue with Apple" variant="ink" onPress={apple} />}
-          {/* Google's own button, not a lookalike. Their branding guidelines want the real mark
-              on a Google sign-in control, and using the component they ship means the logo is
-              theirs rather than an approximation of it.
+          {/* Google's mark on our button, rather than Google's whole button.
 
-              It comes with square corners and no way to change them, which next to a pill and a
-              rounded Apple button read as the odd one out. The native view cannot be told a
-              corner radius, so the wrapper is the pill: it clips the button's white fill to the
-              same shape as the others and draws the border the component does not have. */}
-          {googleAvailable && GoogleButton
-            ? <View style={{ height: 54, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.handle, backgroundColor: colors.white, overflow: 'hidden' }}>
-                <GoogleButton
-                  // Wide, spelled out. The component reads its size constants from the native
-                  // module, and when that lookup comes back empty every one of them is undefined,
-                  // which its own switch matches against the icon case first. 1 is Google's value
-                  // for the wide style, so this says wide either way.
-                  size={GoogleButton.Size?.Wide ?? GOOGLE_BUTTON_WIDE}
-                  color={GoogleButton.Color.Light}
-                  onPress={google}
-                  style={{ width: '100%', height: 54 }}
-                />
-              </View>
-            : googleAvailable
-              ? <Button label="Continue with Google" variant="white" onPress={google} />
-              : null}
+              Theirs ships with square corners, its own typeface and no way to change either, so
+              next to a pill and a rounded Apple button it was always going to be the odd one
+              out. Their guidelines allow a button of your own as long as it carries the real
+              logo, unaltered, which is what this is: the same shape, height and type as the two
+              either side of it, with their asset in front of the words. */}
+          {googleAvailable && (
+            <Button
+              label="Continue with Google"
+              variant="white"
+              onPress={google}
+              icon={<Image source={require('../../assets/google-g.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />}
+            />
+          )}
           <Button label="Continue with email" variant={isIOS || googleAvailable ? 'white' : 'ink'} onPress={() => router.push('/email')} />
           {__DEV__ && <Button label="Look around with sample data" variant="text" onPress={startDemo} />}
           {inExpoGo && (

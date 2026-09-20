@@ -75,8 +75,14 @@ const btnColors: Record<BtnVariant, { bg: string; fg: string; border?: string }>
   danger: { bg: colors.danger, fg: colors.white },
 };
 
-export function Button({ label, onPress, variant = 'violet', style, disabled }: {
+export function Button({ label, onPress, variant = 'violet', style, disabled, icon }: {
   label: string; onPress?: () => void; variant?: BtnVariant; style?: StyleProp<ViewStyle>; disabled?: boolean;
+  /**
+   * A mark to sit left of the label, as one centred unit with it. Here rather than in the one
+   * screen that needs it so a branded button cannot drift from the buttons beside it: height,
+   * radius, border and type all come from the same place whatever is in front of the words.
+   */
+  icon?: ReactNode;
 }) {
   const c = btnColors[variant];
   return (
@@ -85,11 +91,13 @@ export function Button({ label, onPress, variant = 'violet', style, disabled }: 
       onPress={disabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.btn,
+        { flexDirection: 'row', gap: 10 },
         { backgroundColor: c.bg, borderColor: c.border ?? 'transparent', borderWidth: c.border ? 1 : 0, opacity: pressed ? 0.85 : 1 },
         variant === 'text' && { minHeight: 44 },
         style,
       ]}
     >
+      {icon}
       <Text style={{ fontFamily: fonts.semibold, fontSize: variant === 'text' ? 16 : 17, color: c.fg }}>{label}</Text>
     </Pressable>
   );
