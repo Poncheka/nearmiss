@@ -70,20 +70,27 @@ export default function Welcome() {
             />
           )}
           {isIOS && nativeApple === false && <Button label="Continue with Apple" variant="ink" onPress={apple} />}
-          {/* Google's own button, not a lookalike. Their branding guidelines require the real
-              mark on a Google sign-in control, and using the component they ship means the logo
-              is theirs rather than an approximation of it. */}
+          {/* Google's own button, not a lookalike. Their branding guidelines want the real mark
+              on a Google sign-in control, and using the component they ship means the logo is
+              theirs rather than an approximation of it.
+
+              It comes with square corners and no way to change them, which next to a pill and a
+              rounded Apple button read as the odd one out. The native view cannot be told a
+              corner radius, so the wrapper is the pill: it clips the button's white fill to the
+              same shape as the others and draws the border the component does not have. */}
           {googleAvailable && GoogleButton
-            ? <GoogleButton
-                // Wide, spelled out. The component reads its size constants from the native
-                // module, and when that lookup comes back empty every constant is undefined,
-                // which its own switch matches against the icon case first and draws the small
-                // square. 1 is Google's own value for the wide style, so this says it either way.
-                size={GoogleButton.Size?.Wide ?? GOOGLE_BUTTON_WIDE}
-                color={GoogleButton.Color.Light}
-                onPress={google}
-                style={{ width: '100%', height: 54 }}
-              />
+            ? <View style={{ height: 54, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.handle, backgroundColor: colors.white, overflow: 'hidden' }}>
+                <GoogleButton
+                  // Wide, spelled out. The component reads its size constants from the native
+                  // module, and when that lookup comes back empty every one of them is undefined,
+                  // which its own switch matches against the icon case first. 1 is Google's value
+                  // for the wide style, so this says wide either way.
+                  size={GoogleButton.Size?.Wide ?? GOOGLE_BUTTON_WIDE}
+                  color={GoogleButton.Color.Light}
+                  onPress={google}
+                  style={{ width: '100%', height: 54 }}
+                />
+              </View>
             : googleAvailable
               ? <Button label="Continue with Google" variant="white" onPress={google} />
               : null}
