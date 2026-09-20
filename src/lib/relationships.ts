@@ -111,7 +111,18 @@ export async function friendsOf(id: string): Promise<FriendOf[]> {
   return (data ?? []) as FriendOf[];
 }
 
-export type ProfileStats = { friends: number; near_misses: number; mutuals: number };
+export type ProfileStats = {
+  friends: number;
+  near_misses: number;
+  mutuals: number;
+  /**
+   * Whether they have scanned their photos, and null when that isn't yours to know.
+   *
+   * Only friends get an answer. A stranger gets null rather than false, because false is a
+   * claim about someone we have no business making to a person they haven't added.
+   */
+  has_photos: boolean | null;
+};
 
 /**
  * The numbers under someone's name.
@@ -130,5 +141,23 @@ export async function profileStats(id: string): Promise<ProfileStats | null> {
     friends: Number(rows[0].friends ?? 0),
     near_misses: Number(rows[0].near_misses ?? 0),
     mutuals: Number(rows[0].mutuals ?? 0),
+    has_photos: rows[0].has_photos ?? null,
   };
+}
+
+/**
+ * Asks a friend to connect their photos.
+ *
+ * A friendship where one side has no photo history produces nothing: no near misses, an empty
+ * profile, and no way to tell whose turn it is. This puts a notification in front of them that
+ * opens the scan screen.
+ *
+ * Every rule lives on the server, because the app can be lied to: friends only, not blocked,
+ * not someone who has already scanned, and once a week at most. A nudge is a request for
+ * someone's photo library, which is the most personal thing this app asks for, so it is rare
+ * on purpose. The server's message is written for a person to read, so show it as it comes.
+ */
+export async function nudgeFriend(id: string) {
+  const { error } = await supabase.rpc('nudge_friend', { uid: id });
+  if (error) throw new Error(error.message);
 }

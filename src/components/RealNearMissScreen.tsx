@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowUp, ChevronLeft, ChevronRight, ImagePlus } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { NearMissGallery } from '@/components/NearMissGallery';
@@ -41,6 +41,25 @@ export function RealNearMissScreen({ id }: { id: string }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
 
+  /**
+   * Opening straight onto the thing a notification was about.
+   *
+   * "Leigh reacted to your photo" used to leave you at the top of the page to go and find it,
+   * which is most of the work the notification was supposed to save you. The activity row and
+   * the push payload both carry the id of the message or photo, so this scrolls to it and marks
+   * it for a couple of seconds.
+   *
+   * Positions come from onLayout rather than a list library: this is a ScrollView with a map, a
+   * carousel and a share strip above the thread, so an entry's offset is its own y plus the y of
+   * the thread block inside the scroll content.
+   */
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const scroller = useRef<ScrollView>(null);
+  const threadY = useRef(0);
+  const entryY = useRef<Record<string, number>>({});
+  const jumped = useRef(false);
+  const [flash, setFlash] = useState<string | null>(null);
+
   useEffect(() => {
     if (!loaded) useNearMisses.getState().load();
   }, [loaded]);
@@ -69,6 +88,27 @@ export function RealNearMissScreen({ id }: { id: string }) {
     }));
     return [...said, ...shown].sort((a, b) => b.at.localeCompare(a.at));
   }, [comments, photos, me0]);
+
+  // Driven by layout, not by an effect: an effect runs before the children have been measured,
+  // so on the first pass every position is still unknown. Each entry calls this as it lands,
+  // and the one we are looking for is the one that fires it. Runs once, because re-scrolling on
+  // later layout passes would fight the person's own scrolling.
+  const fade = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusIfReady = useCallback(() => {
+    if (!focus || jumped.current) return;
+    const y = entryY.current[focus];
+    if (y === undefined) return;
+    jumped.current = true;
+    setFlash(focus);
+    // A frame's grace so the last layout pass has settled, then leave a little headroom above
+    // so the thing does not sit jammed under the header.
+    requestAnimationFrame(() => {
+      scroller.current?.scrollTo({ y: Math.max(threadY.current + y - 90, 0), animated: true });
+    });
+    fade.current = setTimeout(() => setFlash(null), 2400);
+  }, [focus]);
+
+  useEffect(() => () => { if (fade.current) clearTimeout(fade.current); }, []);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -159,7 +199,11 @@ export function RealNearMissScreen({ id }: { id: string }) {
           <View style={{ width: 44 }} />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scroller}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={{ gap: 8 }}>
             {/* The two faces and the title are one target, because "who is this person" is the
                 question you have while looking at them, not one you go to a menu for. */}
@@ -216,15 +260,33 @@ export function RealNearMissScreen({ id }: { id: string }) {
               they appear here too, in the order everything actually happened. A photo sent
               between two messages is part of the conversation, and pulling it out left replies
               answering nothing. */}
-          <View style={{ gap: 10 }}>
+          <View
+            style={{ gap: 10 }}
+            onLayout={(e) => { threadY.current = e.nativeEvent.layout.y; focusIfReady(); }}
+          >
             <Body size={17} weight="bold" style={{ paddingHorizontal: 4 }}>
               {timeline.length ? 'That day' : `Ask ${name} about that day`}
             </Body>
             {comments === null ? <ActivityIndicator color={colors.violet} /> : timeline.map((entry) => {
               const stamp = new Date(entry.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
               const mine = entry.mine;
+              // Lit for a couple of seconds when you arrived here from a notification about it,
+              // so the thing you were told about is the thing your eye lands on.
+              const lit = flash === entry.id;
               return (
-                <View key={`${entry.kind}-${entry.id}`} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                <View
+                  key={`${entry.kind}-${entry.id}`}
+                  onLayout={(e) => { entryY.current[entry.id] = e.nativeEvent.layout.y; focusIfReady(); }}
+                  style={{
+                    flexDirection: 'row',
+                    gap: 10,
+                    alignItems: 'flex-start',
+                    justifyContent: mine ? 'flex-end' : 'flex-start',
+                    ...(lit
+                      ? { backgroundColor: colors.violetTint, borderRadius: 22, padding: 8, marginHorizontal: -8 }
+                      : null),
+                  }}
+                >
                   {!mine && (
                     <Pressable accessibilityLabel={`Open ${name}'s profile`} onPress={openProfile}>
                       {otherAvatar(32)}

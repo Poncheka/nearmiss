@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import { Href, router, useFocusEffect } from 'expo-router';
-import { CalendarDays, Check, ChevronLeft, Heart, ImageIcon, LucideIcon, MapPin, MessageCircle, UserPlus } from 'lucide-react-native';
+import { CalendarDays, Camera, Check, ChevronLeft, Heart, ImageIcon, LucideIcon, MapPin, MessageCircle, UserPlus } from 'lucide-react-native';
 import { Body, Card, Display, Divider, IconButton, Pill, Screen, SectionLabel, TextLink } from '@/components/ui';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { activity, activityBadge, ActivityItem } from '@/data/mock';
@@ -25,6 +25,7 @@ const badgeFor: Record<string, { color: string; Icon: LucideIcon }> = {
   fof_near_miss: { color: colors.coral, Icon: MapPin },
   met_changed: { color: colors.violet, Icon: CalendarDays },
   photo_shared: { color: colors.greenText, Icon: ImageIcon },
+  nudge: { color: colors.violet, Icon: Camera },
 };
 const defaultBadge = { color: colors.violet, Icon: MapPin };
 
@@ -39,8 +40,21 @@ function RealRow({ item, last }: { item: RealActivity; last: boolean }) {
     // Reading it is what marks it read. Leaving the dot on something you just opened reads as
     // a broken list.
     useActivity.getState().markOneRead(item.id);
-    if (item.near_miss_id) router.push(`/near-miss/${item.near_miss_id}` as Href);
-    else if (item.actor_id) router.push(`/friend/${item.actor_id}` as Href);
+    // A nudge is the one row that isn't about a near miss. It is a request to scan, so it opens
+    // the screen that scans. Landing on the sender's profile instead would be a dead end.
+    if (item.type === 'nudge') {
+      router.push('/settings');
+      return;
+    }
+    // Carry what it was about, so the near miss opens scrolled to that message or photo rather
+    // than at the top with the news buried somewhere below.
+    if (item.near_miss_id) {
+      router.push(
+        (item.target_id
+          ? `/near-miss/${item.near_miss_id}?focus=${item.target_id}`
+          : `/near-miss/${item.near_miss_id}`) as Href,
+      );
+    } else if (item.actor_id) router.push(`/friend/${item.actor_id}` as Href);
   };
 
   const accept = async () => {

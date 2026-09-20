@@ -2,14 +2,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react-native';
 import { Avatar } from '@/components/avatar';
 import { Body, Card, Chip, Display, IconButton, Screen, SectionLabel } from '@/components/ui';
 import { useContacts } from '@/lib/contacts';
 import { useNearMisses } from '@/lib/nearMisses';
 import { NearMissCard } from '@/components/NearMissCard';
 import { useAuth } from '@/lib/auth';
-import { blockUser, FriendOf, friendsOf, ProfileStats, profileStats, PublicProfile, publicProfile, unfriend } from '@/lib/relationships';
+import { blockUser, FriendOf, friendsOf, nudgeFriend, ProfileStats, profileStats, PublicProfile, publicProfile, unfriend } from '@/lib/relationships';
+import { useScan } from '@/state/scan';
 import { colors, pastel, radius } from '@/theme';
 
 export function RealFriendScreen({ id }: { id: string }) {
@@ -69,6 +70,34 @@ export function RealFriendScreen({ id }: { id: string }) {
 
   const name = person?.name?.split(' ')[0] || (person?.username ? `@${person.username}` : 'Friend');
   const back = () => (router.canGoBack() ? router.back() : router.replace('/you'));
+
+  // Whose photos are missing. Mine comes from the scan store, theirs from profile_stats, which
+  // answers only for friends and returns null to everyone else. Null means "not known", not
+  // "no", so neither branch of the card fires on it.
+  const [nudging, setNudging] = useState(false);
+  const [nudged, setNudged] = useState(false);
+  const myStats = useScan((s) => s.stats);
+  useEffect(() => { useScan.getState().refreshStats(); }, []);
+  const iScanned = myStats ? myStats.points > 0 : null;
+  // The server decides this, not the screen: has_photos comes back false only when you are
+  // actually friends, and null otherwise. Gating on local friend state as well would only add
+  // a way for a stale store to hide a button the server would have allowed.
+  const canNudge = stats?.has_photos === false;
+
+  const nudge = async () => {
+    if (nudging) return;
+    setNudging(true);
+    try {
+      await nudgeFriend(id);
+      setNudged(true);
+    } catch (e) {
+      // The server writes these for a person to read, including the rate limit, so pass them
+      // through rather than flattening them into one generic failure.
+      Alert.alert("Couldn't nudge them", e instanceof Error ? e.message : String(e));
+    } finally {
+      setNudging(false);
+    }
+  };
 
   // met_on isn't returned per friend here; if we're still asking about them, it's unset.
   const metKnown = !needsMet && misses.length > 0;
@@ -240,11 +269,54 @@ export function RealFriendScreen({ id }: { id: string }) {
         {since.length > 0 && <Section title={metKnown ? 'Since you met' : 'Near misses'} list={since} />}
 
         {misses.length === 0 && (
-          <Card style={{ padding: 18, gap: 6 }}>
+          /* "Nothing yet" used to be the whole story, which left both people looking at the same
+             card and neither one learning that the other was waiting on them. Now it says whose
+             photos are missing and offers the matching thing to do about it. */
+          <Card style={{ padding: 18, gap: 10 }}>
             <Body size={16} weight="bold">Nothing yet</Body>
-            <Body size={14} color={colors.muted}>
-              Near misses appear once you have both scanned your photos. Anything from the last 30 days is never matched.
-            </Body>
+            {iScanned === false ? (
+              <>
+                <Body size={14} color={colors.muted}>
+                  Your photos aren't connected yet, so there is nothing to match against. Near Miss reads
+                  the time and place saved on them and never leaves your phone with the photos themselves.
+                </Body>
+                <Pressable
+                  accessibilityLabel="Connect your photos"
+                  onPress={() => router.push('/settings')}
+                  style={{ minHeight: 44, paddingHorizontal: 22, borderRadius: radius.pill, backgroundColor: colors.violet, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}
+                >
+                  <Body size={15} weight="bold" color={colors.white}>Connect my photos</Body>
+                </Pressable>
+              </>
+            ) : canNudge ? (
+              <>
+                <Body size={14} color={colors.muted}>
+                  {name} hasn't connected their photos yet, so there is nothing to match against. A nudge
+                  puts a notification in front of them that opens the scan screen.
+                </Body>
+                {nudged ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Check size={17} color={colors.greenText} strokeWidth={2.6} />
+                    <Body size={15} weight="semibold" color={colors.greenText}>Nudged</Body>
+                  </View>
+                ) : nudging ? (
+                  <ActivityIndicator color={colors.violet} style={{ alignSelf: 'flex-start', paddingVertical: 10 }} />
+                ) : (
+                  <Pressable
+                    accessibilityLabel={`Nudge ${name} to connect their photos`}
+                    onPress={nudge}
+                    style={{ minHeight: 44, paddingHorizontal: 22, borderRadius: radius.pill, backgroundColor: colors.violet, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}
+                  >
+                    <Body size={15} weight="bold" color={colors.white}>Nudge {name}</Body>
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <Body size={14} color={colors.muted}>
+                Near misses appear once you have both scanned your photos. Anything from the last 30 days
+                is never matched.
+              </Body>
+            )}
           </Card>
         )}
       </ScrollView>

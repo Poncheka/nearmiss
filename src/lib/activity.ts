@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 
-export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed' | 'reaction';
+export type ActivityKind = 'friend_request' | 'friend_accepted' | 'comment' | 'near_miss' | 'photo_shared' | 'met_changed' | 'reaction' | 'nudge';
 
 export type RealActivity = {
   id: string;
@@ -17,6 +17,8 @@ export type RealActivity = {
   place_name: string | null;
   night: string | null;
   body: string | null;
+  /** The message or photo this is about, so opening it can land on the right thing. */
+  target_id: string | null;
   created_at: string;
   read_at: string | null;
 };
@@ -64,6 +66,9 @@ export function activityText(a: RealActivity): string {
     case 'met_changed': return 'set when you two met';
     // The emoji itself is the message, so it goes in the line rather than being described.
     case 'reaction': return a.body ? `reacted ${a.body}` : 'reacted to something of yours';
+    // Says what it is for, not just that it happened. "Nudged you" on its own reads as a poke
+    // with no obvious response; this one names the thing to do.
+    case 'nudge': return 'is waiting on your photos';
     default: return 'did something';
   }
 }

@@ -13,7 +13,7 @@ import { Figtree_600SemiBold } from '@expo-google-fonts/figtree/600SemiBold';
 import { Figtree_700Bold } from '@expo-google-fonts/figtree/700Bold';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useAutoUpdate } from '@/lib/updates';
-import { usePushRegistration } from '@/lib/push';
+import { useNotificationTaps, usePushRegistration } from '@/lib/push';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -25,6 +25,8 @@ function RootNavigator() {
   // Silent: refreshes the push token only where permission is already granted. The one prompt
   // lives in the feed, under the first near miss.
   usePushRegistration(signedIn);
+  // A tap on a notification should land on the thing it was about, from cold or from running.
+  useNotificationTaps(signedIn && onboarded);
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();

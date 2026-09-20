@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
 
 type Notifications = typeof import('expo-notifications');
 
@@ -117,5 +118,53 @@ export function usePushRegistration(signedIn: boolean) {
       .then((p) => { if (live && p.granted) register(); })
       .catch(() => {});
     return () => { live = false; };
+  }, [signedIn]);
+}
+
+/**
+ * Opening the thing a notification was about.
+ *
+ * Until now a push tap just brought the app to the foreground, wherever it happened to be, so
+ * "Leigh reacted to your photo" led to whatever screen you were last on. Every push carries the
+ * near miss and the id of the item it concerns, so this can land on both: the right page,
+ * scrolled to the right thing.
+ *
+ * Two cases, not one. A tap while the app is running arrives through the listener. A tap that
+ * launched the app from cold is already waiting when this mounts, which is what the first call
+ * collects, and is the case that silently does nothing if you forget it.
+ */
+export function useNotificationTaps(signedIn: boolean) {
+  useEffect(() => {
+    if (!signedIn) return;
+    const N = lib();
+    if (!N) return;
+    let live = true;
+
+    const open = (data: Record<string, unknown> | undefined) => {
+      // Most notifications are about a near miss. A nudge isn't: it asks you to scan, so the
+      // server names the screen it should open. Only our own paths are honoured, because this
+      // string arrives from outside the app.
+      const route = typeof data?.route === 'string' ? data.route : null;
+      if (route === '/settings') {
+        router.push('/settings');
+        return;
+      }
+      const nearMissId = typeof data?.nearMissId === 'string' ? data.nearMissId : null;
+      if (!nearMissId) return;
+      const targetId = typeof data?.targetId === 'string' ? data.targetId : undefined;
+      router.push({
+        pathname: '/near-miss/[id]',
+        params: targetId ? { id: nearMissId, focus: targetId } : { id: nearMissId },
+      });
+    };
+
+    N.getLastNotificationResponseAsync()
+      .then((r) => { if (live && r) open(r.notification.request.content.data as Record<string, unknown>); })
+      .catch(() => {});
+
+    const sub = N.addNotificationResponseReceivedListener((r) => {
+      open(r.notification.request.content.data as Record<string, unknown>);
+    });
+    return () => { live = false; sub.remove(); };
   }, [signedIn]);
 }
