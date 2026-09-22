@@ -10,7 +10,7 @@ import { ShareFromThatNight } from '@/components/ShareFromThatNight';
 import { Body, Card, Chip, Display, IconButton, Pill, Screen } from '@/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
-import { addComment, barelyMissedLine, formatWhen, giveFeedback, isBarelyMissed, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
+import { addComment, barelyMissedLine, formatWhen, isBarelyMissed, kindLabel, loadComments, nearLabel, NearMissComment, otherName, placeLabel, useNearMisses } from '@/lib/nearMisses';
 import { occasionFor } from '@/lib/occasions';
 import { useReactions } from '@/lib/reactions';
 import { SharedPhoto, useSharedPhotos } from '@/lib/sharedPhotos';
@@ -24,12 +24,9 @@ type Entry =
   | { kind: 'text'; id: string; at: string; mine: boolean; body: string }
   | { kind: 'photo'; id: string; at: string; mine: boolean; photo: SharedPhoto };
 
-// "Not interesting" was a shrug with no follow-up: it hid the near miss and taught us nothing,
-// and on a screen whose whole job is to say "this moment mattered" it read as an invitation to
-// dismiss it. "We were together" is the one that carries information worth having.
-const FEEDBACK: { kind: 'together'; label: string }[] = [
-  { kind: 'together', label: 'We were together' },
-];
+// "Not interesting" was a shrug with no follow-up. "We were together" carries real information:
+// you knew each other by then. It used to hide the near miss; now it draws the line where you
+// met, so this night and everything after it with them become memories, and nothing is lost.
 
 export function RealNearMissScreen({ id }: { id: string }) {
   const { session, profile } = useAuth();
@@ -37,6 +34,9 @@ export function RealNearMissScreen({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
   const nm = useNearMisses((s) => s.items.find((x) => x.id === id));
   const loaded = useNearMisses((s) => s.loaded);
+  // A friend we haven't placed a meeting date for yet: everything with them is still a near miss.
+  const otherId = nm?.other_id;
+  const metUnknown = useNearMisses((s) => s.needsMetOn.some((n) => n.friend_id === otherId));
   const [comments, setComments] = useState<NearMissComment[] | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -124,6 +124,8 @@ export function RealNearMissScreen({ id }: { id: string }) {
   }
 
   const name = otherName(nm);
+  // From the night you met onwards it's a memory, not a near miss.
+  const memory = !nm.is_before_met && !metUnknown;
   const when = formatWhen(nm.closest_at);
   const barely = isBarelyMissed(nm);
   const occasion = occasionFor(nm.closest_at, {
@@ -166,18 +168,19 @@ export function RealNearMissScreen({ id }: { id: string }) {
     },
   ]);
 
-  const feedback = (kind: 'together', label: string) => Alert.alert(label, 'This near miss will be hidden from your feed.', [
-    { text: 'Cancel', style: 'cancel' },
-    {
-      text: 'Hide it', onPress: async () => {
-        try {
-          await giveFeedback(nm.id, kind);
-          useNearMisses.setState((s) => ({ items: s.items.filter((x) => x.id !== nm.id) }));
-          back();
-        } catch (e) { Alert.alert("Couldn't save", e instanceof Error ? e.message : String(e)); }
+  const together = () => Alert.alert(
+    'You were together?',
+    `This becomes a memory, along with everything after it with ${name}. Anything earlier stays a near miss.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Make it a memory', onPress: async () => {
+          try { await useNearMisses.getState().markTogether(nm); }
+          catch (e) { Alert.alert("Couldn't save", e instanceof Error ? e.message : String(e)); }
+        },
       },
-    },
-  ]);
+    ],
+  );
 
   const openProfile = () => router.push({ pathname: '/friend/[id]', params: { id: nm.other_id } });
 
@@ -230,6 +233,7 @@ export function RealNearMissScreen({ id }: { id: string }) {
               {occasion ? <Chip label={occasion.label} tone={occasion.loud ? 'green' : 'outline'} /> : null}
               {nm.via_name ? <Chip label={`Friend of ${nm.via_name.split(' ')[0]}`} tone="green" /> : null}
               {nm.is_before_met ? <Chip label="Before you met" tone="violet" /> : null}
+              {memory ? <Chip label="Memory" tone="green" /> : null}
             </View>
 
             {/* The closest calls get said out loud. Everything else stays in the chips. */}
@@ -334,7 +338,7 @@ export function RealNearMissScreen({ id }: { id: string }) {
 
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 8 }}>
-            {FEEDBACK.map((f) => <Pill key={f.kind} label={f.label} variant="white" height={36} textSize={14} onPress={() => feedback(f.kind, f.label)} />)}
+            {memory ? null : <Pill label="We were together" variant="white" height={36} textSize={14} onPress={together} />}
           </View>
         </ScrollView>
 

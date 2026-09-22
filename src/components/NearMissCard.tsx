@@ -10,7 +10,7 @@ import { ChevronRight, MessageCircle, Sparkles } from 'lucide-react-native';
 import { Avatar, PersonAvatar } from '@/components/avatar';
 import { PairMap } from '@/components/map/PairMap';
 import { Body, Chip, ChipTone, UnreadDot } from '@/components/ui';
-import { barelyMissedLine, formatWhen, isBarelyMissed, kindLabel, nearLabel, otherName, placeLabel, RealNearMiss } from '@/lib/nearMisses';
+import { barelyMissedLine, formatWhen, isBarelyMissed, kindLabel, nearLabel, otherName, placeLabel, RealNearMiss, useNearMisses } from '@/lib/nearMisses';
 import { occasionFor } from '@/lib/occasions';
 import { colors, fonts, pastel, radius } from '@/theme';
 
@@ -65,12 +65,15 @@ export const NearMissCard = memo(function NearMissCard({ nm, width, myBirthday }
   const occasion = occasionFor(nm.closest_at, { mine: myBirthday, theirs: nm.other_birthday, theirName: nm.other_name });
   // Never opened. The ribbon says it now, so it does not also need a chip in a row of five.
   const fresh = nm.is_new;
+  // After the night you met it's a memory. Until we know that night, it's still a near miss.
+  const metUnknown = useNearMisses((s) => s.needsMetOn.some((n) => n.friend_id === nm.other_id));
   useEffect(() => { if (fresh) startPulse(); }, [fresh]);
   const tags: { label: string; tone: ChipTone }[] = [];
   tags.push({ label: kindLabel(nm), tone: nm.kind === 'crossed' ? 'violet' : 'outline' });
   if (occasion) tags.push({ label: occasion.label, tone: occasion.loud ? 'green' : 'outline' });
   if (nm.via_name) tags.push({ label: `Friend of ${nm.via_name.split(' ')[0]}`, tone: 'green' });
   if (nm.is_before_met) tags.push({ label: 'Before you met', tone: 'violet' });
+  else if (!metUnknown) tags.push({ label: 'Memory', tone: 'green' });
   return (
     <Pressable
       onPress={() => openNearMiss(nm.id)}

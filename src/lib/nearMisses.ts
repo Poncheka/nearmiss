@@ -56,6 +56,8 @@ type State = {
   load: (opts?: { rematch?: boolean }) => Promise<void>;
   loadNeedsMetOn: () => Promise<void>;
   setMetOn: (friendId: string, date: string | null) => Promise<void>;
+  /** "We were together": this night and everything after it with them become memories. */
+  markTogether: (nm: RealNearMiss) => Promise<void>;
   markRead: (id: string) => void;
   reset: () => void;
 };
@@ -233,6 +235,14 @@ export const useNearMisses = create<State>((set, get) => ({
     if (error) throw new Error(error.message);
     // The server relabels every near miss for the pair, so pull them again.
     set({ needsMetOn: get().needsMetOn.filter((n) => n.friend_id !== friendId) });
+    const { data } = await supabase.rpc('my_near_misses');
+    if (data) set({ items: (data as RealNearMiss[]).map((n) => ({ ...n, comment_count: Number(n.comment_count), unread_count: Number(n.unread_count) })) });
+  },
+  markTogether: async (nm) => {
+    const { error } = await supabase.rpc('we_were_together', { nm_id: nm.id });
+    if (error) throw new Error(error.message);
+    // The meeting date moved, so the server relabelled the whole pair. Nothing is removed.
+    set({ needsMetOn: get().needsMetOn.filter((n) => n.friend_id !== nm.other_id) });
     const { data } = await supabase.rpc('my_near_misses');
     if (data) set({ items: (data as RealNearMiss[]).map((n) => ({ ...n, comment_count: Number(n.comment_count), unread_count: Number(n.unread_count) })) });
   },

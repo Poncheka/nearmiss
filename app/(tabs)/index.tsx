@@ -26,7 +26,7 @@ type Row =
   | { kind: 'post'; nm: NearMiss }
   | { kind: 'real'; nm: RealNearMiss }
   | { kind: 'ask'; friend: NeedsMetOn }
-  | { kind: 'since'; count: number; open: boolean }
+  | { kind: 'since'; count: number }
   | { kind: 'push' }
   | { kind: 'found'; label: string };
 
@@ -148,10 +148,10 @@ const Post = memo(function Post({ nm, width, tags, unread, commentCount }: {
 /**
  * Two ways to read the same near misses.
  *
- * Timeline is the default and the point of the app: oldest first, so it reads as a history of
+ * Timeline is the point of the app: oldest first, so it reads as a history of
  * two lives brushing past each other. But when a friend joins, twenty years of near misses
  * arrive at once and land scattered through that history, which is no way to find out what just
- * turned up. Recently found answers that instead, newest discovery first.
+ * turned up. Recently found answers that instead, newest discovery first, and is the default.
  */
 type Sort = 'timeline' | 'found';
 
@@ -225,7 +225,6 @@ export default function Feed() {
   const comments = useStore((s) => s.comments);
   const activityRead = useStore((s) => s.activityRead);
   const cardWidth = Math.min(width, 640) - PAD * 2 - 2;
-  const [showSince, setShowSince] = useState(false);
   const [sort, setSort] = useState<Sort>('found');
 
   // Whether there is a notifications offer left to make, decided here rather than inside the
@@ -246,21 +245,50 @@ export default function Feed() {
     let year = 0;
     if (!demo && sort === 'found') {
       // Same near misses, same rules about what belongs in the feed. Only the order changes:
-      // newest discovery first, grouped by the day it turned up.
+      // newest discovery first, grouped by the day it turned up. Within a day, oldest night
+      // first, so a friend who just joined reads as a story and the "when did you meet?" card
+      // can sit where it belongs in it.
       const unknown = new Set(real.needsMetOn.map((n) => n.friend_id));
-      const feed = real.items
-        .filter((n) => n.is_before_met || unknown.has(n.other_id))
-        .slice()
-        .sort((a, b) => (b.found_at ?? '').localeCompare(a.found_at ?? ''));
-
-      let heading = '';
-      for (const nm of feed) {
-        const label = nm.found_at ? foundLabel(nm.found_at) : 'Found earlier';
-        if (label !== heading) { heading = label; out.push({ kind: 'found', label }); }
-        out.push({ kind: 'real', nm });
+      const dayOf = (n: RealNearMiss) => (n.found_at ? foundLabel(n.found_at) : 'Found earlier');
+      const newest = new Map<string, string>();
+      for (const n of real.items) {
+        const d = dayOf(n);
+        if ((newest.get(d) ?? '') < (n.found_at ?? '')) newest.set(d, n.found_at ?? '');
       }
+      const byFound = (a: RealNearMiss, b: RealNearMiss) =>
+        (newest.get(dayOf(b)) ?? '').localeCompare(newest.get(dayOf(a)) ?? '')
+        || a.closest_at.localeCompare(b.closest_at);
+      const feed = real.items.filter((n) => n.is_before_met || unknown.has(n.other_id)).sort(byFound);
+      const since = real.items.filter((n) => !n.is_before_met && !unknown.has(n.other_id)).sort(byFound);
+
+      // Nobody to guess a date for: ask up front, same as the timeline.
+      for (const friend of real.needsMetOn.filter((f) => !f.guess)) out.push({ kind: 'ask', friend });
+      // Everyone else gets asked right above the first near miss from around when we think you
+      // met, which is where the pattern changes and the question makes sense.
+      const pending = real.needsMetOn.filter((f) => f.guess);
+      const asked = new Set<string>();
+
+      const withHeadings = (list: RealNearMiss[], ask: boolean) => {
+        let heading = '';
+        for (const nm of list) {
+          const label = dayOf(nm);
+          if (label !== heading) { heading = label; out.push({ kind: 'found', label }); }
+          const f = ask && pending.find(
+            (p) => !asked.has(p.friend_id) && p.friend_id === nm.other_id && p.guess != null && nm.night >= p.guess,
+          );
+          if (f) { asked.add(f.friend_id); out.push({ kind: 'ask', friend: f }); }
+          out.push({ kind: 'real', nm });
+        }
+      };
+      withHeadings(feed, true);
       const first = out.findIndex((r) => r.kind === 'real');
       if (offerPush && first !== -1) out.splice(first + 1, 0, { kind: 'push' });
+      for (const f of pending) if (!asked.has(f.friend_id)) out.push({ kind: 'ask', friend: f });
+      // Memories follow straight on, open, so the feed keeps going instead of ending at a toggle.
+      if (since.length) {
+        out.push({ kind: 'since', count: since.length });
+        withHeadings(since, false);
+      }
       return out;
     }
     if (!demo) {
@@ -298,8 +326,8 @@ export default function Feed() {
       // A guess later than every near miss we have: ask at the end rather than never.
       for (const f of pending) if (!asked.has(f.friend_id)) out.push({ kind: 'ask', friend: f });
       if (since.length) {
-        out.push({ kind: 'since', count: since.length, open: showSince });
-        if (showSince) withYears(since);
+        out.push({ kind: 'since', count: since.length });
+        withYears(since);
       }
       return out;
     }
@@ -308,7 +336,7 @@ export default function Feed() {
       out.push({ kind: 'post', nm });
     }
     return out;
-  }, [demo, real.items, real.needsMetOn, showSince, sort, offerPush]);
+  }, [demo, real.items, real.needsMetOn, sort, offerPush]);
 
   const tagsFor = (nm: NearMiss) => {
     const t: { label: string; tone: ChipTone }[] = [];
@@ -362,12 +390,12 @@ export default function Feed() {
 
       <FlatList
         data={rows}
-        keyExtractor={(r) =>
+        keyExtractor={(r, i) =>
           r.kind === 'year' ? `y${r.year}`
           : r.kind === 'ask' ? `ask${r.friend.friend_id}`
           : r.kind === 'since' ? 'since'
           : r.kind === 'push' ? 'push'
-          : r.kind === 'found' ? `f${r.label}`
+          : r.kind === 'found' ? `f${r.label}${i}`
           : r.nm.id}
         initialNumToRender={4}
         windowSize={5}
@@ -399,18 +427,13 @@ export default function Feed() {
         ) : item.kind === 'ask' ? (
           <AskWhenMet friend={item.friend} />
         ) : item.kind === 'since' ? (
-          <Pressable
-            onPress={() => setShowSince((v) => !v)}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 14, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radius.cardLg, backgroundColor: colors.sand }}
-          >
-            <View style={{ flex: 1 }}>
-              <Body size={15} weight="bold">Since you met</Body>
-              <Body size={13} color={colors.muted}>
-                {item.count} {item.count === 1 ? 'day' : 'days'} you were both there, probably ones you remember
-              </Body>
-            </View>
-            <Body size={14} weight="semibold" color={colors.violet}>{item.open ? 'Hide' : 'Show'}</Body>
-          </Pressable>
+          // A divider, not a toggle: the memories are right underneath it.
+          <View style={{ gap: 2, marginTop: 14, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radius.cardLg, backgroundColor: colors.sand }}>
+            <Body size={15} weight="bold">Since you met</Body>
+            <Body size={13} color={colors.muted}>
+              {item.count} {item.count === 1 ? 'memory' : 'memories'}, days you were both there and probably remember
+            </Body>
+          </View>
         ) : (
           <Post
             nm={item.nm}
