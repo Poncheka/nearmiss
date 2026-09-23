@@ -219,6 +219,9 @@ type ContactsState = {
   onApp: AppUser[];            // contacts who are on Near Miss
   statuses: Record<string, FriendStatus>;
   friends: AppUser[];          // everyone you have a friendship row with
+  /** Everyone with an account, while there are few enough for that to be a list. */
+  everyone: AppUser[];
+  loadEveryone: () => Promise<void>;
   checkAccess: () => Promise<void>;
   /** True once the on-disk cache has been consulted, whether or not it had anything. */
   hydrated: boolean;
@@ -244,6 +247,7 @@ export const useContacts = create<ContactsState>((set, get) => ({
   onApp: [],
   statuses: {},
   friends: [],
+  everyone: [],
   unlinked: false,
   hydrated: false,
   checkAccess: async () => {
@@ -329,6 +333,14 @@ export const useContacts = create<ContactsState>((set, get) => ({
       set({ loading: false });
     }
   },
+  // Early on, everyone here knows everyone here. Asking the server for the whole list beats
+  // making people guess each other's usernames, and the server stops answering once the app
+  // outgrows it.
+  loadEveryone: async () => {
+    const { data, error } = await supabase.rpc('everyone_on_near_miss');
+    if (error) return;
+    set({ everyone: (data ?? []) as AppUser[] });
+  },
   refreshFriends: async () => {
     const { data, error } = await supabase.rpc('my_friendships');
     if (error) return;
@@ -377,7 +389,7 @@ export const useContacts = create<ContactsState>((set, get) => ({
     AsyncStorage.multiRemove([CACHE_KEY, HASH_KEY, SEEN_KEY, DISMISSED_KEY]).catch(() => {});
     memo.clear();
     lastLoadedAt = 0;
-    set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], hydrated: false, arrivals: [] });
+    set({ access: null, loading: false, error: null, contacts: [], onApp: [], statuses: {}, friends: [], everyone: [], hydrated: false, arrivals: [] });
   },
 }));
 

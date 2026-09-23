@@ -32,11 +32,15 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const [demoStatus, setDemoStatus] = useState<Record<string, FriendStatus>>({ sam: 'friends' });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [found, setFound] = useState<AppUser[]>([]);
+  // The contacts half of this screen used to be the whole screen. It is folded away now, and
+  // opens when you ask for it or when you search.
+  const [showContacts, setShowContacts] = useState(false);
 
   useEffect(() => {
     if (demo) return;
     // The cached read goes up first; the live read replaces it when it arrives.
     useContacts.getState().hydrate();
+    useContacts.getState().loadEveryone();
     useContacts.getState().checkAccess().then(() => {
       const { access, loading } = useContacts.getState();
       if ((access === 'granted' || access === 'limited') && !loading) useContacts.getState().load();
@@ -46,6 +50,7 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   // Refresh when the tab is opened (only if access was already given; never pops a prompt by itself).
   useFocusEffect(useCallback(() => {
     if (demo) return;
+    useContacts.getState().loadEveryone();
     const { access, loading } = useContacts.getState();
     if (access === null || loading) return; // first load is handled above
     if (access === 'granted' || access === 'limited') useContacts.getState().load();
@@ -76,6 +81,8 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
   const sections = useMemo(() => {
     const users = new Map<string, AppUser>();
     for (const u of demo ? demoOnApp : c.onApp) users.set(u.id, u);
+    // Everyone with an account, while the app is small enough for that to be a short list.
+    if (!demo) for (const u of c.everyone) if (!users.has(u.id)) users.set(u.id, u);
     for (const u of found) users.set(u.id, u);
     if (!demo) for (const f of c.friends) if (!users.has(f.id)) users.set(f.id, f);
     const match = (s: string) => !query || s.toLowerCase().includes(query);
@@ -95,11 +102,25 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
       .filter((p) => !p.onApp)
       .filter((p) => (query ? true : p.browsable))
       .filter((p) => match(`${p.name} ${p.phone ?? ''} ${p.email ?? ''}`));
-    const out: { key: string; title: string; data: Row[] }[] = [];
-    if (userRows.length) out.push({ key: 'users', title: 'On Near Miss', data: userRows.map((user) => ({ kind: 'user', user })) });
-    if (contactRows.length) out.push({ key: 'contacts', title: 'Invite from your contacts', data: contactRows.map((contact) => ({ kind: 'contact', contact })) });
+    const out: { key: string; title: string; count: number; data: Row[] }[] = [];
+    const everyoneListed = !demo && !query && c.everyone.length > 0;
+    if (userRows.length) out.push({
+      key: 'users',
+      title: everyoneListed ? 'Everyone on Near Miss' : 'On Near Miss',
+      count: userRows.length,
+      data: userRows.map((user) => ({ kind: 'user', user })),
+    });
+    // Always listed, even with nothing in it: the header is the way back to your contacts.
+    // Searching opens it, since what you are looking for may well be down there.
+    const open = showContacts || !!query;
+    out.push({
+      key: 'contacts',
+      title: 'Invite from your contacts',
+      count: contactRows.length,
+      data: open ? contactRows.map((contact) => ({ kind: 'contact', contact })) : [],
+    });
     return out;
-  }, [demo, c.onApp, c.friends, c.contacts, statuses, query, found]);
+  }, [demo, c.onApp, c.everyone, c.friends, c.contacts, statuses, query, found, showContacts]);
 
   const add = async (id: string) => {
     if (demo) return setDemoStatus((s) => ({ ...s, [id]: 'requested' }));
@@ -124,8 +145,9 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
     await sendInvite(p, profile?.username);
   };
 
-  const header = (
-    <View style={{ gap: 12, paddingBottom: 4 }}>
+  // Everything about the address book, kept together under the fold.
+  const contactsPanel = (
+    <View style={{ gap: 12, paddingBottom: 8 }}>
       {!hasAccess && access !== null && access !== 'unavailable' && (
         <Card style={{ padding: 16, gap: 12 }}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
@@ -149,7 +171,6 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
         </Card>
       )}
 
-      {c.loading && sections.length === 0 && <ActivityIndicator color={colors.violet} style={{ paddingVertical: 24 }} />}
       {!demo && access === 'limited' && !c.loading && (
         <Card style={{ padding: 14, gap: 8 }}>
           <Body size={15} color={colors.text2}>You shared {c.contacts.length ? `${c.contacts.length} contact${c.contacts.length === 1 ? '' : 's'}` : 'only some contacts'} with Near Miss.</Body>
@@ -161,6 +182,12 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
           <Body size={15} color={colors.text2}>We didn't find any contacts with a phone number or email on this phone.</Body>
         </Card>
       )}
+    </View>
+  );
+
+  const header = (
+    <View style={{ gap: 12, paddingBottom: 4 }}>
+      {c.loading && sections.length === 0 && <ActivityIndicator color={colors.violet} style={{ paddingVertical: 24 }} />}
       {c.error ? <Body size={14} color={colors.danger}>{c.error}</Body> : null}
     </View>
   );
@@ -216,7 +243,32 @@ export function FriendsScreen({ onboarding = false }: { onboarding?: boolean }) 
         keyboardShouldPersistTaps="handled"
         initialNumToRender={20}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
-        renderSectionHeader={({ section }) => <SectionLabel>{section.title}</SectionLabel>}
+        renderSectionHeader={({ section }) => {
+          if (section.key !== 'contacts') return <SectionLabel>{section.title}</SectionLabel>;
+          const open = showContacts || !!query;
+          return (
+            <View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}
+                onPress={() => setShowContacts((v) => !v)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, marginTop: 18, paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.card, backgroundColor: colors.sand }}
+              >
+                <BookUser size={18} color={colors.ink} strokeWidth={2} />
+                <View style={{ flex: 1 }}>
+                  <Body size={15} weight="bold">Invite from your contacts</Body>
+                  <Body size={13} color={colors.muted}>
+                    {hasAccess
+                      ? `${section.count} ${section.count === 1 ? 'person' : 'people'} to text an invite`
+                      : 'Find the ones already here, invite the rest'}
+                  </Body>
+                </View>
+                <Body size={14} weight="semibold" color={colors.violet}>{open ? 'Hide' : 'Show'}</Body>
+              </Pressable>
+              {open ? <View style={{ paddingTop: 12 }}>{contactsPanel}</View> : null}
+            </View>
+          );
+        }}
         ListEmptyComponent={
           c.loading && !c.contacts.length ? (
             <View style={{ paddingVertical: 48, alignItems: 'center', gap: 12 }}>
